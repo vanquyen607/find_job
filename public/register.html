@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FindJob - Đăng Ký</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      background: #000;
+    }
+
+    .auth-page {
+      min-height: 100vh;
+      display: flex;
+    }
+
+    .auth-brand {
+      flex: 1;
+      background: #0f172a;
+      background-image: url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1920&q=80');
+      background-size: cover;
+      background-position: center;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 3rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .brand-content {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      color: white;
+    }
+
+    .brand-logo {
+      font-size: 4rem;
+      margin-bottom: 1rem;
+    }
+
+    .brand-title {
+      font-size: 2.5rem;
+      font-weight: 800;
+      margin-bottom: 1rem;
+    }
+
+    .brand-subtitle {
+      font-size: 1.125rem;
+      opacity: 0.9;
+      max-width: 400px;
+      line-height: 1.6;
+    }
+
+    .brand-features {
+      margin-top: 3rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .brand-feature {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 1rem;
+      opacity: 0.9;
+    }
+
+    .brand-feature-icon {
+      width: 40px;
+      height: 40px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+    }
+
+    .auth-form-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 3rem;
+      background: #fff;
+    }
+
+    .auth-form-container {
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .auth-form-header {
+      margin-bottom: 2rem;
+    }
+
+    .auth-form-header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 0.5rem;
+    }
+
+    .auth-form-header p {
+      color: #64748b;
+    }
+
+    .auth-form {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .form-group label {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: #1e293b;
+    }
+
+    .form-group input {
+      padding: 0.875rem 1rem;
+      border: 2px solid #e2e8f0;
+      border-radius: 0.75rem;
+      font-size: 1rem;
+      transition: all 0.2s;
+      background: #f8fafc;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #6366f1;
+      box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+    }
+
+    .form-error {
+      display: none;
+      padding: 0.75rem 1rem;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 0.5rem;
+      color: #dc2626;
+      font-size: 0.875rem;
+    }
+
+    .form-error.show {
+      display: block;
+    }
+
+    .btn-submit {
+      padding: 1rem;
+      background: linear-gradient(135deg, #0ea5e9, #06b6d4);
+      color: #fff;
+      border: none;
+      border-radius: 0.75rem;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 0.5rem;
+    }
+
+    .btn-submit:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(99, 102, 241, 0.3);
+    }
+
+    .btn-submit:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-submit .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-right: 0.5rem;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .auth-switch {
+      text-align: center;
+      margin-top: 1.5rem;
+      color: #64748b;
+    }
+
+    .auth-switch a {
+      color: #6366f1;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .auth-switch a:hover {
+      text-decoration: underline;
+    }
+
+    .back-home {
+      position: absolute;
+      top: 2rem;
+      left: 2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: white;
+      text-decoration: none;
+      font-weight: 500;
+      opacity: 0.9;
+      transition: opacity 0.2s;
+      z-index: 10;
+    }
+
+    .back-home:hover {
+      opacity: 1;
+    }
+
+    @media (max-width: 768px) {
+      .auth-page {
+        flex-direction: column;
+      }
+
+      .auth-brand {
+        padding: 2rem;
+        min-height: auto;
+      }
+
+      .brand-title {
+        font-size: 1.75rem;
+      }
+
+      .brand-features {
+        display: none;
+      }
+
+      .auth-form-panel {
+        padding: 2rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-page">
+    <!-- Left Panel -->
+    <div class="auth-brand">
+      <a href="/" class="back-home">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="m12 19-7-7 7-7"/>
+          <path d="M19 12H5"/>
+        </svg>
+        Về trang chủ
+      </a>
+      
+      <div class="brand-content">
+        <div class="brand-logo">💼</div>
+        <h1 class="brand-title">Find<span style="font-weight: 400;">Job</span></h1>
+        <p class="brand-subtitle">Tìm kiếm việc làm thông minh từ 5 nền tảng lớn</p>
+        
+        <div class="brand-features">
+          <div class="brand-feature">
+            <div class="brand-feature-icon">⚡</div>
+            <span>Scrape dữ liệu real-time</span>
+          </div>
+          <div class="brand-feature">
+            <div class="brand-feature-icon">🎯</div>
+            <span>Lọc thông minh theo yêu cầu</span>
+          </div>
+          <div class="brand-feature">
+            <div class="brand-feature-icon">📊</div>
+            <span>So sánh và lưu việc yêu thích</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Panel - Register Form -->
+    <div class="auth-form-panel">
+      <div class="auth-form-container">
+        <div class="auth-form-header">
+          <h1>Đăng ký</h1>
+          <p>Tạo tài khoản để bắt đầu tìm việc</p>
+        </div>
+        
+        <form class="auth-form" id="register-form" onsubmit="handleRegister(event)">
+          <div class="form-group">
+            <label for="name">Họ tên</label>
+            <input type="text" id="name" placeholder="Nguyễn Văn A" required>
+          </div>
+          
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" placeholder="email@example.com" required>
+          </div>
+          
+          <div class="form-group">
+            <label for="password">Mật khẩu</label>
+            <input type="password" id="password" placeholder="Ít nhất 6 ký tự" required minlength="6">
+          </div>
+          
+          <div class="form-group">
+            <label for="confirm-password">Xác nhận mật khẩu</label>
+            <input type="password" id="confirm-password" placeholder="Nhập lại mật khẩu" required minlength="6">
+          </div>
+          
+          <div class="form-error hidden" id="error-message"></div>
+          
+          <button type="submit" class="btn-submit" id="submit-btn">Đăng ký</button>
+        </form>
+        
+        <div class="auth-switch">
+          Đã có tài khoản? <a href="/login.html">Đăng nhập</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = window.location.origin;
+    
+    // Check if already logged in
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      window.location.href = '/';
+    }
+    
+    async function handleRegister(e) {
+      e.preventDefault();
+      
+      const name = document.getElementById('name').value;
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const confirmPassword = document.getElementById('confirm-password').value;
+      const errorEl = document.getElementById('error-message');
+      const submitBtn = document.getElementById('submit-btn');
+      
+      // Validate passwords match
+      if (password !== confirmPassword) {
+        errorEl.textContent = 'Mật khẩu không khớp';
+        errorEl.classList.add('show');
+        return;
+      }
+      
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="spinner"></span> Đang xử lý...';
+      errorEl.classList.remove('show');
+      submitBtn.style.opacity = '0.7';
+      
+      try {
+        const response = await fetch(`${API_BASE}/api/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, password })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Có lỗi xảy ra');
+        }
+        
+        localStorage.setItem('authToken', data.token);
+        localStorage.setItem('currentUser', JSON.stringify(data.user));
+        
+        submitBtn.innerHTML = '✓ Đăng ký thành công!';
+        submitBtn.style.background = '#22c55e';
+        submitBtn.style.opacity = '1';
+        
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 1500);
+      } catch (error) {
+        errorEl.textContent = error.message;
+        errorEl.classList.add('show');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = 'Đăng ký';
+        submitBtn.style.opacity = '1';
+      }
+    }
+  </script>
+</body>
+</html>
