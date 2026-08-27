@@ -1,7 +1,9 @@
-FROM node:18-slim
+FROM node:22-slim
 
-# Install dependencies for Playwright
 RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
     wget \
     ca-certificates \
     fonts-liberation \
@@ -25,19 +27,14 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install --production
+RUN npm install
 
-# Install Playwright browsers
 RUN npx playwright install chromium
 
-# Copy app files
 COPY . .
 
-# Create data directory
 RUN mkdir -p /app/data
 
 EXPOSE 3000
