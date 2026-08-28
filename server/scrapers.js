@@ -957,7 +957,7 @@ async function scrapeAll(keyword) {
   }
 
   const SCRAPE_TIMEOUT = parseInt(process.env.SCRAPE_TIMEOUT) || 40000;
-  const ENABLE_BROWSER = process.env.ENABLE_BROWSER !== 'false';
+  const MAX_JOBS_PER_PLATFORM = parseInt(process.env.MAX_JOBS_PER_PLATFORM) || 20;
   
   // HTTP-only scrapers work everywhere; Playwright scrapers need more RAM
   const httpScrapers = [
@@ -965,11 +965,11 @@ async function scrapeAll(keyword) {
     { name: 'CareerViet', fn: scrapeCareerViet }
   ];
   
-  const browserScrapers = ENABLE_BROWSER ? [
+  const browserScrapers = [
     { name: 'Glints', fn: scrapeGlints },
     { name: 'ITviec', fn: scrapeITviec },
     { name: 'TopCV', fn: scrapeTopCV }
-  ] : [];
+  ];
 
   const allScrapers = [...httpScrapers, ...browserScrapers];
   const results = [];
@@ -986,8 +986,9 @@ async function scrapeAll(keyword) {
           scraper.name
         );
         recordMetric(scraper.name, Date.now() - startTime, true);
-        console.log(`[${scraper.name}] OK: ${jobs.length} jobs in ${Date.now() - startTime}ms`);
-        return { name: scraper.name, jobs };
+        const limited = jobs.slice(0, MAX_JOBS_PER_PLATFORM);
+        console.log(`[${scraper.name}] OK: ${limited.length} jobs in ${Date.now() - startTime}ms`);
+        return { name: scraper.name, jobs: limited };
       } catch (err) {
         recordMetric(scraper.name, Date.now() - startTime, false);
         console.error(`[${scraper.name}] Failed: ${err.message}`);
@@ -1017,9 +1018,10 @@ async function scrapeAll(keyword) {
         SCRAPE_TIMEOUT,
         scraper.name
       );
+      const limited = jobs.slice(0, MAX_JOBS_PER_PLATFORM);
       recordMetric(scraper.name, Date.now() - startTime, true);
-      console.log(`[${scraper.name}] OK: ${jobs.length} jobs in ${Date.now() - startTime}ms`);
-      results.push({ status: 'fulfilled', value: { name: scraper.name, jobs } });
+      console.log(`[${scraper.name}] OK: ${limited.length} jobs in ${Date.now() - startTime}ms`);
+      results.push({ status: 'fulfilled', value: { name: scraper.name, jobs: limited } });
     } catch (err) {
       recordMetric(scraper.name, Date.now() - startTime, false);
       console.error(`[${scraper.name}] Failed: ${err.message}`);
