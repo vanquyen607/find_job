@@ -136,11 +136,12 @@ async function getBrowser() {
   return browser;
 }
 
-// Stealth browser for Cloudflare-protected sites
+// Stealth browser for Cloudflare-protected sites (uses system Chrome)
 async function getStealthBrowser() {
   if (!stealthBrowser || !stealthBrowser.isConnected()) {
-    stealthBrowser = await playwrightExtra.launch({ 
+    stealthBrowser = await chromium.launch({ 
       headless: true,
+      channel: 'chrome',
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
