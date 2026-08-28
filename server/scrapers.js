@@ -956,26 +956,31 @@ async function scrapeAll(keyword) {
     return cached;
   }
 
-  const SCRAPE_TIMEOUT = parseInt(process.env.SCRAPE_TIMEOUT) || 45000;
+  const SCRAPE_TIMEOUT = parseInt(process.env.SCRAPE_TIMEOUT) || 40000;
   
-  const scrapers = [
+  // HTTP-only scrapers work everywhere; Playwright scrapers need more RAM
+  const httpScrapers = [
     { name: 'VietnamWorks', fn: scrapeVietnamWorks },
+    { name: 'CareerViet', fn: scrapeCareerViet }
+  ];
+  
+  const browserScrapers = [
     { name: 'Glints', fn: scrapeGlints },
     { name: 'ITviec', fn: scrapeITviec },
-    { name: 'CareerViet', fn: scrapeCareerViet },
     { name: 'TopCV', fn: scrapeTopCV }
   ];
 
-  const results = await Promise.allSettled(
-    scrapers.map(async (scraper, index) => {
-      await delay(index * 200);
+  const allScrapers = [...httpScrapers, ...browserScrapers];
+  const results = [];
+
+  // Run HTTP scrapers in parallel (lightweight)
+  console.log('[SCRAPE] Running HTTP scrapers...');
+  const httpResults = await Promise.allSettled(
+    httpScrapers.map(async (scraper) => {
       const startTime = Date.now();
       try {
         const jobs = await withTimeout(
-          withRetry(
-            () => scraper.fn(keyword),
-            { maxRetries: 1, delayMs: 1000, platform: scraper.name }
-          ),
+          scraper.fn(keyword),
           SCRAPE_TIMEOUT,
           scraper.name
         );
@@ -989,6 +994,40 @@ async function scrapeAll(keyword) {
       }
     })
   );
+  results.push(...httpResults);
+
+  // Run browser scrapers ONE BY ONE (save RAM), close browser between each
+  console.log('[SCRAPE] Running browser scrapers (sequential)...');
+  for (const scraper of browserScrapers) {
+    // Check memory before each browser scraper
+    const memUsed = process.memoryUsage().heapUsed / 1024 / 1024;
+    console.log(`[${scraper.name}] Memory: ${Math.round(memUsed)}MB used`);
+    
+    if (memUsed > 400) {
+      console.error(`[${scraper.name}] Skipped - too much memory used`);
+      results.push({ status: 'fulfilled', value: { name: scraper.name, jobs: [] } });
+      continue;
+    }
+    
+    const startTime = Date.now();
+    try {
+      const jobs = await withTimeout(
+        scraper.fn(keyword),
+        SCRAPE_TIMEOUT,
+        scraper.name
+      );
+      recordMetric(scraper.name, Date.now() - startTime, true);
+      console.log(`[${scraper.name}] OK: ${jobs.length} jobs in ${Date.now() - startTime}ms`);
+      results.push({ status: 'fulfilled', value: { name: scraper.name, jobs } });
+    } catch (err) {
+      recordMetric(scraper.name, Date.now() - startTime, false);
+      console.error(`[${scraper.name}] Failed: ${err.message}`);
+      results.push({ status: 'fulfilled', value: { name: scraper.name, jobs: [] } });
+    }
+    
+    // Close browser to free memory before next scraper
+    await closeBrowser();
+  }
 
   let allJobs = [];
   const sources = {};
