@@ -958,18 +958,22 @@ async function scrapeAll(keyword) {
 
   const SCRAPE_TIMEOUT = parseInt(process.env.SCRAPE_TIMEOUT) || 40000;
   const MAX_JOBS_PER_PLATFORM = parseInt(process.env.MAX_JOBS_PER_PLATFORM) || 20;
+  const ENABLE_BROWSER = process.env.ENABLE_BROWSER === 'true';
   
-  // HTTP-only scrapers work everywhere; Playwright scrapers need more RAM
   const httpScrapers = [
     { name: 'VietnamWorks', fn: scrapeVietnamWorks },
     { name: 'CareerViet', fn: scrapeCareerViet }
   ];
   
-  const browserScrapers = [
+  const browserScrapers = ENABLE_BROWSER ? [
     { name: 'Glints', fn: scrapeGlints },
     { name: 'ITviec', fn: scrapeITviec },
     { name: 'TopCV', fn: scrapeTopCV }
-  ];
+  ] : [];
+  
+  if (!ENABLE_BROWSER) {
+    console.log('[SCRAPE] Browser scrapers disabled (set ENABLE_BROWSER=true to enable)');
+  }
 
   const allScrapers = [...httpScrapers, ...browserScrapers];
   const results = [];
