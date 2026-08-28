@@ -136,19 +136,35 @@ async function getBrowser() {
   return browser;
 }
 
-// Stealth browser for Cloudflare-protected sites (uses system Chrome)
+// Stealth browser for Cloudflare-protected sites
 async function getStealthBrowser() {
   if (!stealthBrowser || !stealthBrowser.isConnected()) {
-    stealthBrowser = await chromium.launch({ 
-      headless: true,
-      channel: 'chrome',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-blink-features=AutomationControlled',
-        '--disable-features=IsolateOrigins,site-per-process'
-      ]
-    });
+    try {
+      // Try system Chrome first (bypasses Cloudflare better)
+      stealthBrowser = await chromium.launch({ 
+        headless: true,
+        channel: 'chrome',
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-blink-features=AutomationControlled',
+          '--disable-features=IsolateOrigins,site-per-process'
+        ]
+      });
+      console.log('[Browser] Launched with system Chrome');
+    } catch (e) {
+      // Fallback to bundled Chromium
+      console.log('[Browser] Chrome not found, using bundled Chromium');
+      stealthBrowser = await chromium.launch({ 
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-blink-features=AutomationControlled',
+          '--disable-features=IsolateOrigins,site-per-process'
+        ]
+      });
+    }
   }
   return stealthBrowser;
 }
