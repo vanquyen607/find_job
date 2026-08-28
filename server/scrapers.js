@@ -919,6 +919,15 @@ function cleanAndDeduplicate(jobs) {
 }
 
 // ==================== SCRAPE ALL ====================
+function withTimeout(promise, ms, name) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => 
+      setTimeout(() => reject(new Error(`${name} timeout after ${ms}ms`)), ms)
+    )
+  ]);
+}
+
 async function scrapeAll(keyword) {
   console.log(`\n[SCRAPE] ========== Searching: "${keyword}" ==========\n`);
   
@@ -931,6 +940,8 @@ async function scrapeAll(keyword) {
     return cached;
   }
 
+  const SCRAPE_TIMEOUT = parseInt(process.env.SCRAPE_TIMEOUT) || 45000;
+  
   const scrapers = [
     { name: 'VietnamWorks', fn: scrapeVietnamWorks },
     { name: 'Glints', fn: scrapeGlints },
@@ -941,18 +952,23 @@ async function scrapeAll(keyword) {
 
   const results = await Promise.allSettled(
     scrapers.map(async (scraper, index) => {
-      await delay(index * 300);
+      await delay(index * 200);
       const startTime = Date.now();
       try {
-        const jobs = await withRetry(
-          () => scraper.fn(keyword),
-          { maxRetries: 2, delayMs: 1000, platform: scraper.name }
+        const jobs = await withTimeout(
+          withRetry(
+            () => scraper.fn(keyword),
+            { maxRetries: 1, delayMs: 1000, platform: scraper.name }
+          ),
+          SCRAPE_TIMEOUT,
+          scraper.name
         );
         recordMetric(scraper.name, Date.now() - startTime, true);
+        console.log(`[${scraper.name}] OK: ${jobs.length} jobs in ${Date.now() - startTime}ms`);
         return { name: scraper.name, jobs };
       } catch (err) {
         recordMetric(scraper.name, Date.now() - startTime, false);
-        console.error(`[${scraper.name}] Failed after retries: ${err.message}`);
+        console.error(`[${scraper.name}] Failed: ${err.message}`);
         return { name: scraper.name, jobs: [] };
       }
     })
@@ -974,7 +990,7 @@ async function scrapeAll(keyword) {
   // Fetch details for jobs without description (max 10 jobs to avoid timeout)
   console.log('[SCRAPE] Fetching job details...');
   console.log(`[SCRAPE] Jobs to process: ${cleaned.length}`);
-  const withDetails = await batchGetDetails(cleaned, 10);
+  const withDetails = await batchGetDetails(cleaned, 5);
   console.log(`[SCRAPE] Jobs after detail fetch: ${withDetails.length}`);
 
   console.log('\n[SCRAPE] ========== Results ==========');

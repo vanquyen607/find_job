@@ -15,6 +15,15 @@ const adminRoutes = require('./routes/admin');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+function withTimeout(promise, ms, name) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${name} timeout after ${ms}ms`)), ms)
+    )
+  ]);
+}
+
 // ==================== SECURITY MIDDLEWARE ====================
 app.use(helmet({
   contentSecurityPolicy: {
@@ -120,7 +129,7 @@ app.get('/api/search', rateLimiter, async (req, res) => {
 
   try {
     const startTime = Date.now();
-    const jobs = await scrapeAll(q.trim());
+    const jobs = await withTimeout(scrapeAll(q.trim()), 90000, 'Search API');
     const duration = Date.now() - startTime;
     
     // Save jobs to database for future searches
