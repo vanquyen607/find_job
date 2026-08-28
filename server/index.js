@@ -5,7 +5,7 @@ const helmet = require('helmet');
 const path = require('path');
 const { scrapeAll, scrapeJobDetail, closeBrowser, getMetrics } = require('./scrapers');
 const { extractUser } = require('./auth');
-const { saveJobs, cleanupExpiredJobs, closeDb } = require('./database');
+const { initDb, saveJobs, cleanupExpiredJobs, closeDb } = require('./database');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -207,14 +207,22 @@ process.on('unhandledRejection', (reason) => {
 });
 
 // ==================== START SERVER ====================
-app.listen(PORT, () => {
-  console.log(`
-  ╔══════════════════════════════════════════════╗
-  ║   FindJob Server v1.0                        ║
-  ║   Port: ${PORT}                                 ║
-  ║   URL: http://localhost:${PORT}                  ║
-  ║   Cache: 30 min TTL                          ║
-  ║   Rate Limit: ${RATE_LIMIT_MAX} req/min              ║
-  ╚══════════════════════════════════════════════╝
-  `);
+async function start() {
+  await initDb();
+  app.listen(PORT, () => {
+    console.log(`
+    ╔══════════════════════════════════════════════╗
+    ║   FindJob Server v1.0                        ║
+    ║   Port: ${PORT}                                 ║
+    ║   URL: http://localhost:${PORT}                  ║
+    ║   Cache: 30 min TTL                          ║
+    ║   Rate Limit: ${RATE_LIMIT_MAX} req/min              ║
+    ╚══════════════════════════════════════════════╝
+    `);
+  });
+}
+
+start().catch(err => {
+  console.error('[FATAL] Failed to start:', err);
+  process.exit(1);
 });
