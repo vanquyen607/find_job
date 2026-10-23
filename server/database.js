@@ -105,6 +105,7 @@ function initSchema() {
   try { db.run('CREATE INDEX IF NOT EXISTS idx_search_user ON search_history(user_id)'); } catch(e) {}
 
   createDefaultAdmin();
+  syncAdminPasswordFromEnv();
   rotateLegacyAdminPassword();
 }
 
@@ -205,6 +206,27 @@ function createDefaultAdmin() {
   } else {
     console.log(`[DB] Created admin account: ${adminEmail} (password from ADMIN_PASSWORD)`);
   }
+}
+
+// Keep the deployed admin password in sync with ADMIN_PASSWORD. Without this,
+// an existing database keeps its old random hash and new env values are ignored.
+function syncAdminPasswordFromEnv() {
+  const configuredPassword = process.env.ADMIN_PASSWORD;
+  if (!configuredPassword) return;
+
+  const adminEmail = (process.env.ADMIN_EMAIL || 'admin@findjob.vn').toLowerCase();
+  const admin = getUserByEmail(adminEmail)
+    || queryOne("SELECT * FROM users WHERE role = 'admin' ORDER BY id LIMIT 1");
+
+  if (!admin || !admin.password_hash) return;
+  if (bcrypt.compareSync(configuredPassword, admin.password_hash)) return;
+
+  runSql('UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [
+    bcrypt.hashSync(configuredPassword, 10),
+    admin.id
+  ]);
+  saveDb();
+  console.log(`[DB] Admin password synced from ADMIN_PASSWORD for ${admin.email}`);
 }
 
 // Remove the old hard-coded admin/admin123 credentials from existing databases.
