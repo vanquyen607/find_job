@@ -37,6 +37,10 @@ COPY . .
 
 RUN mkdir -p /app/data
 
+ENV NODE_ENV=production
+ENV DATA_DIR=/app/data
+ENV TRUST_PROXY=1
+
 EXPOSE 3000
 
 CMD ["node", "server/index.js"]

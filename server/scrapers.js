@@ -3,6 +3,7 @@ const cheerio = require('cheerio');
 const { chromium } = require('playwright');
 const { chromium: playwrightExtra } = require('playwright-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+const { isAllowedJobUrl } = require('./security');
 
 // Add stealth plugin
 playwrightExtra.use(StealthPlugin());
@@ -184,6 +185,15 @@ async function getJobDetail(job) {
     });
     const page = await context.newPage();
 
+    // Block navigations (including redirects) outside the allowed job platforms.
+    await page.route('**/*', (route) => {
+      const request = route.request();
+      if (request.isNavigationRequest() && !isAllowedJobUrl(request.url())) {
+        return route.abort();
+      }
+      return route.continue();
+    });
+
     await page.goto(job.url, { waitUntil: 'domcontentloaded', timeout: 15000 });
     await page.waitForTimeout(job.platform === 'topcv' ? 2000 : 1500);
 
@@ -200,16 +210,33 @@ async function getJobDetail(job) {
       let requirements = '';
 
       if (platform === 'careerviet') {
-        description = get([
-          '.job-description',
-          '.description-content',
-          '[class*="description"]'
-        ]);
-        requirements = get([
-          '.job-requirement',
-          '.requirement-content',
-          '[class*="requirement"]'
-        ]);
+        // CareerViet renders metadata and job sections as .detail-row blocks.
+        document.querySelectorAll('.job-detail-content .detail-row').forEach(row => {
+          const heading = row.querySelector('.detail-title')?.innerText.trim() || '';
+          if (!heading) return;
+
+          const sectionText = row.innerText.replace(heading, '').trim();
+          if (/mô tả/i.test(heading)) {
+            description = sectionText;
+          } else if (/yêu cầu/i.test(heading)) {
+            requirements = sectionText;
+          }
+        });
+
+        if (!description) {
+          description = get([
+            '.job-description',
+            '.description-content',
+            '[class*="description"]'
+          ]);
+        }
+        if (!requirements) {
+          requirements = get([
+            '.job-requirement',
+            '.requirement-content',
+            '[class*="requirement"]'
+          ]);
+        }
       } else if (platform === 'itviec') {
         description = get([
           '.job-description',
@@ -287,42 +314,35 @@ async function getJobDetail(job) {
   return job;
 }
 
-// Batch get details for multiple jobs
+// Batch get details for multiple jobs (input order = relevance order)
 async function batchGetDetails(jobs, maxDetails = 5) {
-  // Prioritize CareerViet (which we know works), then ITviec, skip Glints (403)
-  const careervietJobs = jobs.filter(j => j.platform === 'careerviet' && j.description.length < 100);
-  const itviecJobs = jobs.filter(j => j.platform === 'itviec' && j.description.length < 100);
-  const otherJobs = jobs.filter(j => !['careerviet', 'itviec'].includes(j.platform) || j.description.length >= 100);
-  
-  const allPriorityJobs = [...careervietJobs, ...itviecJobs];
-  const jobsWithDetails = [];
-  let count = 0;
+  // CareerViet and ITviec support direct detail pages. Glints blocks detail
+  // requests and TopCV already returns usable card data, so skip both.
+  const detailPlatforms = new Set(['careerviet', 'itviec']);
+  const eligible = jobs
+    .filter(j => detailPlatforms.has(j.platform) && String(j.description || '').length < 100);
 
-  // Fetch details for priority platforms
-  for (const job of allPriorityJobs) {
-    if (count >= maxDetails) break;
+  // Stay inside the most relevant jobs, then prefer cards with no description.
+  const candidates = eligible
+    .slice(0, maxDetails * 2)
+    .sort((a, b) => {
+      const aHasDesc = String(a.description || '').trim() ? 1 : 0;
+      const bHasDesc = String(b.description || '').trim() ? 1 : 0;
+      return aHasDesc - bHasDesc;
+    })
+    .slice(0, maxDetails);
+
+  const updatedByUrl = new Map();
+
+  for (const job of candidates) {
     console.log(`[Detail] Fetching detail for: ${job.title.substring(0, 50)}...`);
     const updated = await getJobDetail(job);
-    jobsWithDetails.push(updated);
-    count++;
+    updatedByUrl.set(job.url, updated);
     await delay(500);
   }
 
-  // Add remaining jobs (VietnamWorks already has details, Glints skipped)
-  for (const job of otherJobs) {
-    if (!jobsWithDetails.find(j => j.url === job.url)) {
-      jobsWithDetails.push(job);
-    }
-  }
-
-  // Add remaining priority jobs that weren't fetched
-  for (const job of allPriorityJobs) {
-    if (!jobsWithDetails.find(j => j.url === job.url)) {
-      jobsWithDetails.push(job);
-    }
-  }
-
-  return jobsWithDetails;
+  // Preserve the incoming (relevance-ranked) order.
+  return jobs.map(job => updatedByUrl.get(job.url) || job);
 }
 
 // ==================== VIETNAMWORKS (API) ✅ ====================
@@ -351,21 +371,34 @@ async function scrapeVietnamWorks(keyword) {
 
     const items = data?.data || [];
     items.forEach(job => {
-      let salary = 'Thương lượng';
+      let salary = job.prettySalary || 'Thương lượng';
       if (job.isSalaryVisible && job.salaryMin > 0) {
-        salary = `${job.salaryMin.toLocaleString()} - ${job.salaryMax.toLocaleString()} VNĐ`;
+        const currency = job.salaryCurrency === 'VND' ? 'VNĐ' : (job.salaryCurrency || '');
+        if (job.salaryMax > 0) {
+          salary = `${job.salaryMin.toLocaleString()} - ${job.salaryMax.toLocaleString()} ${currency}`.trim();
+        } else if (job.prettySalary) {
+          salary = job.prettySalary;
+        } else {
+          salary = `${job.salaryMin.toLocaleString()} ${currency}`.trim();
+        }
       }
 
       const skills = (job.skills || []).map(s => s.skillName).join(', ');
       const desc = (job.jobDescription || '').replace(/<[^>]*>/g, '').substring(0, 500);
       const req = (job.jobRequirement || '').replace(/<[^>]*>/g, '').substring(0, 500);
+      const workingLocations = Array.isArray(job.workingLocations) ? job.workingLocations : [];
+      const location = job.address || workingLocations
+        .map(loc => loc.address || loc.cityNameVI || loc.cityName)
+        .filter(Boolean)
+        .slice(0, 2)
+        .join('; ');
 
       jobs.push({
         title: job.jobTitle || '',
         company: job.companyName || '',
-        location: job.address || '',
+        location,
         salary,
-        experience: job.jobLevelId ? `Level ${job.jobLevelId}` : '',
+        experience: job.jobLevelVI || job.jobLevel || '',
         description: desc,
         requirements: req,
         skills,
@@ -396,7 +429,7 @@ async function scrapeGlints(keyword) {
     });
     const page = await context.newPage();
 
-    const url = `https://glints.com/vn/opportunities/jobs?keyword=${encodeURIComponent(keyword)}&country=VN`;
+    const url = `https://glints.com/vn/opportunities/jobs/explore?keyword=${encodeURIComponent(keyword)}&country=VN`;
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForTimeout(5000);
 
@@ -414,7 +447,7 @@ async function scrapeGlints(keyword) {
         const link = titleEl ? titleEl.href : '';
 
         // Salary
-        const salaryEl = item.querySelector('[class*="Salary"], [class*="salary"]');
+        const salaryEl = item.querySelector('span[class*="SalaryWrapper"]');
         let salary = salaryEl ? salaryEl.innerText.trim() : '';
         // Clean salary - remove job title prefix if duplicated
         if (salary.includes('\n')) {
@@ -430,24 +463,42 @@ async function scrapeGlints(keyword) {
 
         tags.forEach(tag => {
           const text = tag.innerText.trim();
-          if (text.match(/\d+\s*-\s*\d+\s*năm|\d+\+?\s*năm|Không yêu cầu/i)) {
+          const normalizedTag = text.replace(/[–—]/g, '-');
+
+          if (/\d+\s*-\s*\d+\s*năm|\d+\+?\s*năm|Không yêu cầu/i.test(normalizedTag)) {
             experience = text;
           } else if (text.includes('Cao Đẳng') || text.includes('Đại Học') || text.includes('Cử Nhân')) {
             education = text;
           } else if (text.includes('fulltime') || text.includes('parttime') || text.includes('Thực tập')) {
             jobType = text;
-          } else if (text.length > 2 && text.length < 50 && !text.includes('Premium')) {
+          } else if (
+            text.length > 2 && text.length < 50 &&
+            !text.startsWith('+') && !text.includes('Premium')
+          ) {
             skills.push(text);
           }
         });
 
-        // Company
-        const companyEl = item.querySelector('[class*="Company"], [class*="company"]');
-        const company = companyEl ? companyEl.innerText.trim() : '';
+        // The card only renders a few tags and hides the rest behind "+N".
+        // This tracking attribute contains the complete skill list.
+        const cardInfo = (item.getAttribute('data-gtm-job-card-info') || '')
+          .split(',')
+          .map(value => value.trim())
+          .filter(value => value && !['experience', 'salary', 'logo'].includes(value.toLowerCase()));
+        skills.push(...cardInfo);
 
-        // Location
-        const locationEl = item.querySelector('[class*="Location"], [class*="location"]');
-        const location = locationEl ? locationEl.innerText.trim() : '';
+        // Company & location live in the same metadata block; read the
+        // company link text first, then use the remaining lines for location.
+        const companyContainer = item.querySelector('[data-cy="company_name_job_card"]');
+        const companyLink = companyContainer?.querySelector('a[aria-label*="company name"]')
+          || item.querySelector('a[aria-label*="company name"]');
+        const company = companyLink ? companyLink.innerText.trim() : '';
+        const companyLines = companyContainer
+          ? companyContainer.innerText.split('\n').map(line => line.trim()).filter(Boolean)
+          : [];
+        const location = company
+          ? companyLines.filter(line => line !== company).join(' - ').trim()
+          : companyLines.slice(1).join(' - ').trim();
 
         // Posted time
         const timeEl = item.querySelector('[class*="time"], [class*="date"], [class*="Time"]');
@@ -853,7 +904,8 @@ async function scrapeITviec(keyword) {
     await page.waitForTimeout(3000);
 
     const pageData = await page.evaluate(() => {
-      const items = document.querySelectorAll('[class*="job-card"], [data-job-id]');
+      // Only real cards are divs; segment banners are anchors with a similar class.
+      const items = document.querySelectorAll('div[class*="job-card"], [data-job-id]');
       const results = [];
 
       items.forEach((item, i) => {
@@ -863,11 +915,15 @@ async function scrapeITviec(keyword) {
         const title = titleEl ? titleEl.innerText.trim() : '';
         const link = titleEl ? titleEl.href : '';
 
-        const companyEl = item.querySelector('[class*="company"], [class*="employer"]');
-        const company = companyEl ? companyEl.innerText.trim() : '';
+        const companyLink = [...item.querySelectorAll('a[href*="/companies/"]')]
+          .find(linkEl => linkEl.innerText.trim());
+        const company = companyLink ? companyLink.innerText.trim() : '';
 
-        const locationEl = item.querySelector('[class*="city"], [class*="location"], .text-muted');
-        const location = locationEl ? locationEl.innerText.trim() : '';
+        const locationEl = item.querySelector('div[title]')
+          || [...item.querySelectorAll('div[title]')].find(el => el.innerText.trim());
+        const location = locationEl
+          ? (locationEl.getAttribute('title') || locationEl.innerText).trim()
+          : '';
 
         const salaryEl = item.querySelector('[class*="salary"], [class*="Salary"]');
         const salary = salaryEl ? salaryEl.innerText.trim() : '';
@@ -920,11 +976,20 @@ async function scrapeITviec(keyword) {
 }
 
 // ==================== CLEAN & DEDUPLICATE ====================
+function normalizeSalary(value) {
+  const salary = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!salary || /sign in to view|login to view|đăng nhập để xem/i.test(salary)) {
+    return 'Thương lượng';
+  }
+  return salary;
+}
+
 function cleanAndDeduplicate(jobs) {
   const seen = new Set();
   return jobs.filter(job => {
     job.title = job.title.replace(/\s+/g, ' ').trim();
     job.company = job.company.replace(/\s+/g, ' ').trim();
+    job.salary = normalizeSalary(job.salary);
 
     const key = `${job.title.toLowerCase()}-${job.company.toLowerCase()}-${job.platform}`;
     if (seen.has(key)) return false;
@@ -934,14 +999,101 @@ function cleanAndDeduplicate(jobs) {
   });
 }
 
+const STOP_WORDS = new Set([
+  'va', 'voi', 'cho', 'cua', 'tai', 'trong', 'la', 'cac', 'nhung', 'mot',
+  'and', 'or', 'the', 'for', 'with', 'job', 'jobs', 'viec', 'lam'
+]);
+
+function normalizeText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase();
+}
+
+function getKeywordTokens(keyword) {
+  return [...new Set(
+    normalizeText(keyword)
+      .split(/[^a-z0-9+#.]+/)
+      .filter(token => token.length >= 2 && !STOP_WORDS.has(token))
+  )];
+}
+
+function scoreJob(job, tokens, phrase) {
+  if (!tokens.length) return 0;
+
+  const title = normalizeText(job.title);
+  const body = normalizeText([job.description, job.requirements, job.skills].filter(Boolean).join(' '));
+  const company = normalizeText(job.company);
+  const location = normalizeText(job.location);
+
+  let score = 0;
+  if (phrase && title.includes(phrase)) score += 60;
+
+  for (const token of tokens) {
+    if (title.includes(token)) score += 40;
+    if (body.includes(token)) score += 15;
+    if (company.includes(token)) score += 5;
+    if (location.includes(token)) score += 10;
+  }
+
+  return score;
+}
+
+function rankJobs(jobs, keyword) {
+  const tokens = getKeywordTokens(keyword);
+  const phrase = normalizeText(keyword).trim();
+
+  return jobs
+    .map((job, index) => ({ job, index, score: scoreJob(job, tokens, phrase) }))
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map(entry => entry.job);
+}
+
+function hasTextMatch(job, tokens, phrase) {
+  const text = normalizeText([
+    job.title,
+    job.description,
+    job.requirements,
+    job.skills,
+    job.location
+  ].filter(Boolean).join(' '));
+
+  return Boolean((phrase && text.includes(phrase)) || tokens.some(token => text.includes(token)));
+}
+
+function filterRelevant(jobs, keyword) {
+  const tokens = getKeywordTokens(keyword);
+  const phrase = normalizeText(keyword).trim();
+
+  const scored = jobs
+    .map((job, index) => ({ job, index, score: scoreJob(job, tokens, phrase) }))
+    .sort((a, b) => b.score - a.score || a.index - b.index);
+
+  const textMatched = scored.filter(entry => hasTextMatch(entry.job, tokens, phrase));
+
+  // CareerViet and Glints mix loosely related listings into search results.
+  // Keep only jobs that actually mention the keyword; the remaining sources
+  // already apply the query server-side.
+  const broadPlatforms = new Set(['careerviet', 'glints']);
+  const filtered = scored.filter(entry =>
+    !broadPlatforms.has(entry.job.platform) || hasTextMatch(entry.job, tokens, phrase)
+  );
+
+  // For rare keywords, don't risk an almost-empty result set.
+  return (textMatched.length >= 8 ? filtered : scored).map(entry => entry.job);
+}
+
 // ==================== SCRAPE ALL ====================
 function withTimeout(promise, ms, name) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => 
-      setTimeout(() => reject(new Error(`${name} timeout after ${ms}ms`)), ms)
-    )
-  ]);
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${name} timeout after ${ms}ms`)), ms);
+  });
+
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 async function scrapeAll(keyword) {
@@ -1049,11 +1201,15 @@ async function scrapeAll(keyword) {
 
   const cleaned = cleanAndDeduplicate(allJobs);
 
-  // Fetch details for jobs without description (max 10 jobs to avoid timeout)
+  // Rank before fetching details so the most relevant jobs get enriched first.
+  const ranked = rankJobs(cleaned, keyword);
+
+  // Fetch details for jobs without description (max 5 to stay within timeout)
   console.log('[SCRAPE] Fetching job details...');
-  console.log(`[SCRAPE] Jobs to process: ${cleaned.length}`);
-  const withDetails = await batchGetDetails(cleaned, 5);
-  console.log(`[SCRAPE] Jobs after detail fetch: ${withDetails.length}`);
+  console.log(`[SCRAPE] Jobs to process: ${ranked.length}`);
+  const withDetails = await batchGetDetails(ranked, 5);
+  const relevantJobs = filterRelevant(withDetails, keyword);
+  console.log(`[SCRAPE] Jobs after detail fetch: ${withDetails.length}, relevant: ${relevantJobs.length}`);
 
   console.log('\n[SCRAPE] ========== Results ==========');
   console.log('[SCRAPE] Sources:', sources);
@@ -1061,9 +1217,9 @@ async function scrapeAll(keyword) {
   console.log('[SCRAPE] =================================\n');
 
   // Cache the results
-  setCache(cacheKey, withDetails);
+  setCache(cacheKey, relevantJobs);
 
-  return withDetails;
+  return relevantJobs;
 }
 
 async function closeBrowser() {

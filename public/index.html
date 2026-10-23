@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Tìm kiếm việc làm thông minh từ VietnamWorks, CareerViet, ITviec, Glints và TopCV. Lọc, so sánh và lưu việc làm yêu thích ở một nơi.">
+  <meta name="theme-color" content="#0f172a">
   <title>FindJob - Tìm Kiếm Việc Làm Thông Minh</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1848,23 +1850,13 @@
           </a>
 
           <!-- Desktop nav -->
-          <div class="nav-desktop">
-            <div class="nav-pill">
-              <a href="#" class="nav-link">Nền tảng</a>
-              <a href="#" class="nav-link">Tính năng</a>
-              <a href="#" class="nav-link">
-                Giới thiệu
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="m6 9 6 6 6-6"/>
-                </svg>
-              </a>
-            </div>
+          <div class="nav-desktop" id="landing-nav">
             <a href="/login.html" class="btn-cta-nav">Đăng nhập</a>
             <a href="/register.html" class="btn-cta-nav">Đăng ký</a>
           </div>
 
           <!-- Mobile hamburger -->
-          <button class="mobile-menu-btn" id="mobile-menu-btn" onclick="toggleMobileMenu()">
+          <button type="button" class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Mở menu" aria-expanded="false" aria-controls="mobile-drawer">
             <svg class="icon-menu" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="4" x2="20" y1="12" y2="12"/>
               <line x1="4" x2="20" y1="6" y2="6"/>
@@ -1879,20 +1871,13 @@
       </nav>
 
       <!-- Mobile overlay -->
-      <div class="mobile-overlay" id="mobile-overlay" onclick="toggleMobileMenu()"></div>
+      <div class="mobile-overlay" id="mobile-overlay" data-action="close-mobile-menu"></div>
 
       <!-- Mobile drawer -->
-      <div class="mobile-drawer" id="mobile-drawer">
+      <div class="mobile-drawer" id="mobile-drawer" aria-hidden="true">
         <div class="mobile-drawer-links">
-          <a href="#" class="mobile-drawer-link">Nền tảng</a>
-          <a href="#" class="mobile-drawer-link">Tính năng</a>
-          <a href="#" class="mobile-drawer-link">
-            Giới thiệu
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="m6 9 6 6 6-6"/>
-            </svg>
-          </a>
-          <a href="#" class="mobile-drawer-link">Liên hệ</a>
+          <a href="/login.html" class="mobile-drawer-link">Đăng nhập</a>
+          <a href="/register.html" class="mobile-drawer-link">Đăng ký</a>
         </div>
         <div class="mobile-drawer-cta">
           <a href="/register.html">Bắt đầu ngay</a>
@@ -1903,15 +1888,20 @@
       <main class="nexum-main">
         <div class="hero-left">
           <h1 class="hero-title">Tìm kiếm việc làm thông minh từ 5 nền tảng</h1>
+          <p class="hero-platforms">VietnamWorks · CareerViet · ITviec · Glints · TopCV</p>
 
-          <div class="email-cta">
+          <form class="email-cta" id="email-cta-form" novalidate>
+            <label for="signup-email" class="sr-only">Email của bạn</label>
             <input
               type="email"
+              id="signup-email"
+              name="email"
               placeholder="Nhập email của bạn"
               class="email-input"
+              autocomplete="email"
             />
-            <a href="/register.html" class="btn-cta-main">Bắt đầu ngay</a>
-          </div>
+            <button type="submit" class="btn-cta-main">Bắt đầu ngay</button>
+          </form>
         </div>
 
         <div class="glass-cards">
@@ -1951,8 +1941,8 @@
   <div id="app-page" class="app-page hidden">
     <header class="app-header">
       <div class="app-header-inner">
-        <a href="/" class="app-logo" onclick="showLanding(); return false;">
-          <svg viewBox="0 0 256 256" fill="currentColor">
+        <a href="/" class="app-logo" data-action="show-landing" aria-label="FindJob - về trang giới thiệu">
+          <svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">
             <path d="M 128 128 C 128 198.692 70.692 256 0 256 C 0 185.308 57.308 128 128 128 Z M 128 128 C 198.692 128 256 185.308 256 256 C 185.308 256 128 198.692 128 128 Z M 0 0 C 70.692 0 128 57.308 128 128 C 57.308 128 0 70.692 0 0 Z M 256 0 C 256 70.692 198.692 128 128 128 C 128 57.308 185.308 0 256 0 Z" />
           </svg>
           <span>Find<span class="text-gradient">Job</span></span>
@@ -1963,37 +1953,37 @@
             <span class="stat-item"><span class="stat-number">5</span> nền tảng</span>
           </div>
           <div class="user-menu" id="user-menu">
-            <button class="user-menu-btn" onclick="toggleUserDropdown()">
+            <button type="button" class="user-menu-btn" data-action="toggle-user-menu" aria-haspopup="true" aria-expanded="false" aria-controls="user-dropdown">
               <span class="user-avatar" id="user-avatar">U</span>
               <span class="user-name" id="user-name">User</span>
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <path d="m6 9 6 6 6-6"/>
               </svg>
             </button>
-            <div class="user-dropdown hidden" id="user-dropdown">
-              <a href="#" onclick="showSavedJobs(); return false;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <div class="user-dropdown hidden" id="user-dropdown" role="menu">
+              <a href="#" role="menuitem" data-action="show-saved-jobs">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                   <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
                 </svg>
                 Việc đã lưu
               </a>
-              <a href="#" onclick="showSearchHistory(); return false;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <a href="#" role="menuitem" data-action="show-search-history">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                   <circle cx="12" cy="12" r="10"></circle>
                   <polyline points="12 6 12 12 16 14"></polyline>
                 </svg>
                 Lịch sử tìm kiếm
               </a>
-              <a href="/admin.html" class="admin-link" id="admin-link" style="display: none;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <a href="/admin.html" class="admin-link" id="admin-link" role="menuitem" hidden>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                   <circle cx="12" cy="12" r="3"></circle>
                   <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
                 </svg>
                 Admin Dashboard
               </a>
               <hr>
-              <a href="#" onclick="logout(); return false;" class="logout-link">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <a href="#" role="menuitem" data-action="logout" class="logout-link">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                   <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
                   <polyline points="16 17 21 12 16 7"></polyline>
                   <line x1="21" y1="12" x2="9" y2="12"></line>
@@ -2021,30 +2011,33 @@
                 <path d="m21 21-4.3-4.3"></path>
               </svg>
               <input
-                type="text"
+                type="search"
                 id="search-input"
                 class="search-input"
                 placeholder="Nhập tên công việc... (VD: React Developer, Python, Marketing)"
                 autocomplete="off"
+                aria-label="Từ khóa tìm kiếm việc làm"
+                maxlength="100"
               >
-              <button id="search-btn" class="search-btn">
+              <button type="button" id="search-btn" class="search-btn">
                 <span class="btn-text">Tìm kiếm</span>
                 <span class="btn-spinner hidden">
-                  <svg class="spinner" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <svg class="spinner" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
                   </svg>
                 </span>
               </button>
             </div>
-            <div class="search-tags">
+            <div class="search-tags" aria-label="Từ khóa phổ biến">
               <span class="tag-label">Phổ biến:</span>
-              <button class="tag" data-query="React Developer">React</button>
-              <button class="tag" data-query="Python Developer">Python</button>
-              <button class="tag" data-query="Frontend Developer">Frontend</button>
-              <button class="tag" data-query="Backend Developer">Backend</button>
-              <button class="tag" data-query="Marketing">Marketing</button>
-              <button class="tag" data-query="Designer">Designer</button>
+              <button type="button" class="tag" data-query="React Developer">React</button>
+              <button type="button" class="tag" data-query="Python Developer">Python</button>
+              <button type="button" class="tag" data-query="Frontend Developer">Frontend</button>
+              <button type="button" class="tag" data-query="Backend Developer">Backend</button>
+              <button type="button" class="tag" data-query="Marketing">Marketing</button>
+              <button type="button" class="tag" data-query="Designer">Designer</button>
             </div>
+            <div class="recent-searches" id="recent-searches" hidden></div>
           </div>
 
           <div class="filter-bar" id="filter-bar">
@@ -2067,7 +2060,7 @@
               </label>
             </div>
             <div class="filter-group">
-              <span class="filter-label">Sắp xếp:</span>
+              <label class="filter-label" for="sort-select">Sắp xếp:</label>
               <select id="sort-select" class="sort-select">
                 <option value="relevance">Liên quan</option>
                 <option value="salary-desc">Lương cao → thấp</option>
@@ -2076,8 +2069,8 @@
               </select>
             </div>
             <div class="filter-group">
-              <button class="btn-advanced-filter" onclick="toggleAdvancedFilters()">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <button type="button" class="btn-advanced-filter" data-action="toggle-advanced-filters" aria-expanded="false" aria-controls="advanced-filters">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                   <line x1="4" x2="4" y1="21" y2="14"></line>
                   <line x1="4" x2="4" y1="10" y2="3"></line>
                   <line x1="12" x2="12" y1="21" y2="12"></line>
@@ -2092,8 +2085,8 @@
               </button>
             </div>
             <div class="filter-group">
-              <button class="btn-export" onclick="exportToCSV()">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <button type="button" class="btn-export" data-action="export-csv">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                   <polyline points="7 10 12 15 17 10"></polyline>
                   <line x1="12" x2="12" y1="15" y2="3"></line>
@@ -2107,8 +2100,8 @@
           <div class="advanced-filters hidden" id="advanced-filters">
             <div class="advanced-filter-row">
               <div class="filter-group">
-                <label class="filter-label">Mức lương:</label>
-                <select id="salary-filter" class="filter-select" onchange="applyFilters()">
+                <label class="filter-label" for="salary-filter">Mức lương:</label>
+                <select id="salary-filter" class="filter-select">
                   <option value="">Tất cả</option>
                   <option value="0-5">Dưới 5 triệu</option>
                   <option value="5-10">5 - 10 triệu</option>
@@ -2119,8 +2112,8 @@
                 </select>
               </div>
               <div class="filter-group">
-                <label class="filter-label">Kinh nghiệm:</label>
-                <select id="experience-filter" class="filter-select" onchange="applyFilters()">
+                <label class="filter-label" for="experience-filter">Kinh nghiệm:</label>
+                <select id="experience-filter" class="filter-select">
                   <option value="">Tất cả</option>
                   <option value="fresher">Fresher (0 năm)</option>
                   <option value="1-2">1 - 2 năm</option>
@@ -2129,8 +2122,8 @@
                 </select>
               </div>
               <div class="filter-group">
-                <label class="filter-label">Địa điểm:</label>
-                <select id="location-filter" class="filter-select" onchange="applyFilters()">
+                <label class="filter-label" for="location-filter">Địa điểm:</label>
+                <select id="location-filter" class="filter-select">
                   <option value="">Tất cả</option>
                   <option value="ha-noi">Hà Nội</option>
                   <option value="hcm">Hồ Chí Minh</option>
@@ -2153,8 +2146,8 @@
             </div>
           </div>
           <div>
-            <button class="btn-compare hidden" id="btn-compare" onclick="showCompareModal()">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <button type="button" class="btn-compare hidden" id="btn-compare" data-action="show-compare">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
               </svg>
@@ -2170,23 +2163,27 @@
           <div class="progress-text" id="progress-text">Đang tìm kiếm...</div>
         </div>
 
-        <div id="results-container" class="results-grid"></div>
+        <div id="results-container" class="results-grid" aria-busy="false"></div>
 
-        <div id="loading" class="loading hidden">
-          <div class="loading-spinner"></div>
+        <div id="loading" class="loading hidden" role="status">
+          <div class="loading-spinner" aria-hidden="true"></div>
           <p>Đang tìm kiếm từ nhiều nguồn...</p>
         </div>
 
-        <div id="error-message" class="error-message hidden">
-          <span class="error-icon">⚠️</span>
+        <div id="error-message" class="error-message hidden" role="alert">
+          <span class="error-icon" aria-hidden="true">⚠️</span>
           <p id="error-text"></p>
+          <button type="button" class="btn-retry" data-action="retry-search">Thử lại</button>
         </div>
 
         <div id="empty-state" class="empty-state">
-          <div class="empty-icon">🔍</div>
+          <div class="empty-icon" aria-hidden="true">🔍</div>
           <p>Nhập tên công việc để bắt đầu tìm kiếm</p>
-          <p style="color: #94a3b8; font-size: 0.875rem; margin-top: 0.5rem;">Nhấn <kbd>/</kbd> để focus • <kbd>Enter</kbd> để tìm</p>
+          <p class="empty-hint">Nhấn <kbd>/</kbd> để focus • <kbd>Enter</kbd> để tìm</p>
         </div>
+
+        <div id="sr-status" class="sr-only" role="status" aria-live="polite"></div>
+        <div id="toast-region" class="toast-region" role="status" aria-live="polite"></div>
       </div>
     </main>
 
@@ -2197,11 +2194,11 @@
 
   <!-- ==================== MODALS ==================== -->
   <!-- Saved Jobs Modal -->
-  <div class="modal-backdrop hidden" id="saved-jobs-modal">
-    <div class="modal-content">
+  <div class="modal-backdrop hidden" id="saved-jobs-modal" role="dialog" aria-modal="true" aria-labelledby="saved-jobs-title">
+    <div class="modal-content saved-jobs-modal-content">
       <div class="modal-header">
-        <h2>Việc làm đã lưu</h2>
-        <button class="modal-close" onclick="closeSavedJobsModal()">&times;</button>
+        <h2 id="saved-jobs-title">Việc làm đã lưu</h2>
+        <button type="button" class="modal-close" data-action="close-modal" aria-label="Đóng">&times;</button>
       </div>
       <div class="modal-body">
         <div id="saved-jobs-list">
@@ -2214,11 +2211,11 @@
   </div>
 
   <!-- Compare Modal -->
-  <div class="modal-backdrop hidden" id="compare-modal">
-    <div class="modal-content" style="max-width: 800px;">
+  <div class="modal-backdrop hidden" id="compare-modal" role="dialog" aria-modal="true" aria-labelledby="compare-title">
+    <div class="modal-content compare-modal-content">
       <div class="modal-header">
-        <h2>So sánh việc làm</h2>
-        <button class="modal-close" onclick="closeCompareModal()">&times;</button>
+        <h2 id="compare-title">So sánh việc làm</h2>
+        <button type="button" class="modal-close" data-action="close-modal" aria-label="Đóng">&times;</button>
       </div>
       <div class="modal-body">
         <div class="compare-table-wrapper">
@@ -2235,24 +2232,6 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
-  <script>
-    // Mobile menu toggle
-    function toggleMobileMenu() {
-      const btn = document.getElementById('mobile-menu-btn');
-      const overlay = document.getElementById('mobile-overlay');
-      const drawer = document.getElementById('mobile-drawer');
-      
-      btn.classList.toggle('open');
-      overlay.classList.toggle('open');
-      drawer.classList.toggle('open');
-      
-      if (drawer.classList.contains('open')) {
-        document.body.style.overflow = 'hidden';
-      } else {
-        document.body.style.overflow = '';
-      }
-    }
-  </script>
+  <script src="app.js" defer></script>
 </body>
 </html>

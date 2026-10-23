@@ -2,8 +2,18 @@ const jwt = require('jsonwebtoken');
 const { getUserById } = require('./database');
 
 const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  console.error('FATAL: JWT_SECRET is not set in environment variables');
+const WEAK_SECRETS = new Set([
+  'your-super-secret-key-change-this',
+  'secret',
+  'changeme',
+  'jwt-secret'
+]);
+
+if (!JWT_SECRET || JWT_SECRET.length < 32 || WEAK_SECRETS.has(JWT_SECRET)) {
+  console.error(
+    'FATAL: JWT_SECRET must be set to a random string of at least 32 characters.\n' +
+    'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(48).toString(\'base64url\'))"'
+  );
   process.exit(1);
 }
 const JWT_EXPIRES_IN = '7d';

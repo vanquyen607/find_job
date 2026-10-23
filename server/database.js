@@ -1,6 +1,7 @@
 const initSqlJs = require('sql.js');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 
 const DATA_DIR = process.env.DATA_DIR || __dirname;
@@ -104,6 +105,7 @@ function initSchema() {
   try { db.run('CREATE INDEX IF NOT EXISTS idx_search_user ON search_history(user_id)'); } catch(e) {}
 
   createDefaultAdmin();
+  rotateLegacyAdminPassword();
 }
 
 function queryAll(sql, params = []) {
@@ -174,19 +176,62 @@ function deleteUser(id) {
   saveDb();
 }
 
+function hasAdmin() {
+  return !!queryOne("SELECT 1 FROM users WHERE role = 'admin' LIMIT 1");
+}
+
 function createDefaultAdmin() {
-  const adminEmail = 'admin@findjob.vn';
-  const adminPassword = 'admin123';
-  const existing = getUserByEmail(adminEmail);
-  if (!existing) {
-    const passwordHash = bcrypt.hashSync(adminPassword, 10);
-    runSql(
-      'INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?)',
-      [adminEmail, passwordHash, 'Admin', 'admin']
+  if (hasAdmin()) return;
+
+  const adminEmail = (process.env.ADMIN_EMAIL || 'admin@findjob.vn').toLowerCase();
+  const configuredPassword = process.env.ADMIN_PASSWORD;
+  const generatedPassword = configuredPassword
+    ? null
+    : crypto.randomBytes(18).toString('base64url');
+  const adminPassword = configuredPassword || generatedPassword;
+
+  const passwordHash = bcrypt.hashSync(adminPassword, 10);
+  runSql(
+    'INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?)',
+    [adminEmail, passwordHash, 'Admin', 'admin']
+  );
+  saveDb();
+
+  if (generatedPassword) {
+    console.warn(
+      `[DB] Created admin account: ${adminEmail} / ${generatedPassword}\n` +
+      '[DB] This password is shown only once. Set ADMIN_EMAIL and ADMIN_PASSWORD in .env to control it.'
     );
-    saveDb();
-    console.log(`[DB] Created default admin: ${adminEmail} / ${adminPassword}`);
+  } else {
+    console.log(`[DB] Created admin account: ${adminEmail} (password from ADMIN_PASSWORD)`);
   }
+}
+
+// Remove the old hard-coded admin/admin123 credentials from existing databases.
+function rotateLegacyAdminPassword() {
+  const legacyEmail = 'admin@findjob.vn';
+  const legacy = getUserByEmail(legacyEmail);
+  if (!legacy || !legacy.password_hash) return;
+  if (!bcrypt.compareSync('admin123', legacy.password_hash)) return;
+
+  const newPassword = process.env.ADMIN_PASSWORD || crypto.randomBytes(18).toString('base64url');
+  runSql('UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [
+    bcrypt.hashSync(newPassword, 10),
+    legacy.id
+  ]);
+  saveDb();
+
+  console.warn(
+    `[SECURITY] Default admin password detected and rotated for ${legacyEmail}.\n` +
+    (process.env.ADMIN_PASSWORD
+      ? '[SECURITY] New password comes from ADMIN_PASSWORD.'
+      : `[SECURITY] Temporary password: ${newPassword} (shown once, change it after login).`)
+  );
+}
+
+function countAdmins() {
+  const row = queryOne("SELECT COUNT(*) AS total FROM users WHERE role = 'admin'");
+  return row ? Number(row.total) : 0;
 }
 
 function updateUser(id, updates) {
@@ -212,30 +257,55 @@ function verifyPassword(plainPassword, hash) {
 }
 
 // ==================== JOB OPERATIONS ====================
+function limit(value, maxLength, preserveNewlines = false) {
+  if (value === null || value === undefined) return '';
+  const str = String(value);
+  const normalized = preserveNewlines
+    ? str.replace(/[^\S\r\n]+/g, ' ').replace(/\n{3,}/g, '\n\n')
+    : str.replace(/\s+/g, ' ');
+  return normalized.trim().slice(0, maxLength);
+}
+
 function saveJobs(jobs) {
   ensureReady();
   let saved = 0;
   const stmt = db.prepare(`
-    INSERT OR REPLACE INTO jobs (title, company, location, salary, experience, description, requirements, url, platform, skills, scraped_at, expires_at)
+    INSERT INTO jobs (title, company, location, salary, experience, description, requirements, url, platform, skills, scraped_at, expires_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, datetime('now', '+6 hours'))
+    ON CONFLICT(url) DO UPDATE SET
+      title = excluded.title,
+      company = excluded.company,
+      location = excluded.location,
+      salary = excluded.salary,
+      experience = excluded.experience,
+      description = excluded.description,
+      requirements = excluded.requirements,
+      platform = excluded.platform,
+      skills = excluded.skills,
+      scraped_at = CURRENT_TIMESTAMP,
+      expires_at = excluded.expires_at
   `);
   for (const job of jobs) {
     try {
+      if (!job || !job.platform) continue;
+      const url = limit(job.url, 1000);
+      const title = limit(job.title, 300);
+      if (!title || !url) continue;
       stmt.run([
-        job.title,
-        job.company || '',
-        job.location || '',
-        job.salary || '',
-        job.experience || '',
-        job.description || '',
-        job.requirements || '',
-        job.url || '',
-        job.platform,
-        job.skills || ''
+        title,
+        limit(job.company, 200),
+        limit(job.location, 200),
+        limit(job.salary, 100),
+        limit(job.experience, 100),
+        limit(job.description, 5000, true),
+        limit(job.requirements, 5000, true),
+        url,
+        limit(job.platform, 40),
+        limit(job.skills, 500)
       ]);
       saved++;
     } catch (e) {
-      // Skip duplicates
+      // Skip malformed rows
     }
   }
   stmt.free();
@@ -261,6 +331,10 @@ function searchJobs(keyword, platform = null) {
 
 function getJobByUrl(url) {
   return queryOne('SELECT * FROM jobs WHERE url = ?', [url]);
+}
+
+function getJobById(id) {
+  return queryOne('SELECT * FROM jobs WHERE id = ?', [id]);
 }
 
 // ==================== SAVED JOBS OPERATIONS ====================
@@ -318,8 +392,13 @@ function getSearchHistory(userId, limit = 20) {
 
 // ==================== CLEANUP ====================
 function cleanupExpiredJobs() {
-  runSql("DELETE FROM jobs WHERE expires_at < datetime('now')");
+  const result = runSql(`
+    DELETE FROM jobs
+    WHERE expires_at < datetime('now')
+      AND id NOT IN (SELECT job_id FROM saved_jobs)
+  `);
   saveDb();
+  return result.changes;
 }
 
 function closeDb() {
@@ -341,6 +420,8 @@ module.exports = {
   saveJobs,
   searchJobs,
   getJobByUrl,
+  getJobById,
+  countAdmins,
   saveJobForUser,
   removeSavedJob,
   getSavedJobs,
