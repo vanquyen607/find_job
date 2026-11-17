@@ -5,11 +5,12 @@ const API_BASE = window.location.origin;
 const PLATFORM_META = {
   vietnamworks: { name: 'VietnamWorks', color: '#1d4ed8' },
   careerviet: { name: 'CareerViet', color: '#15803d' },
+  chotot: { name: 'Chợ Tốt', color: '#ea580c' },
   itviec: { name: 'ITviec', color: '#b45309' },
   glints: { name: 'Glints', color: '#0e7490' },
   topcv: { name: 'TopCV', color: '#b91c1c' }
 };
-const PLATFORM_ORDER = ['vietnamworks', 'careerviet', 'itviec', 'glints', 'topcv'];
+const PLATFORM_ORDER = ['vietnamworks', 'careerviet', 'chotot', 'itviec', 'glints', 'topcv'];
 const MAX_COMPARE = 4;
 const VISIBLE_PER_PLATFORM = 6;
 const RECENT_SEARCH_LIMIT = 6;
@@ -853,9 +854,14 @@ function refreshSaveButtons() {
 
 function updateSavedCount() {
   const badge = document.getElementById('saved-count');
-  if (!badge) return;
-  badge.textContent = String(state.savedJobs.length);
-  badge.hidden = state.savedJobs.length === 0;
+  if (badge) {
+    badge.textContent = String(state.savedJobs.length);
+    badge.hidden = state.savedJobs.length === 0;
+  }
+  // Dashboard stat card mirrors the same number.
+  document.querySelectorAll('.js-saved-mirror').forEach((el) => {
+    el.textContent = String(state.savedJobs.length);
+  });
 }
 
 function setSaveButtonState(btn, saved) {

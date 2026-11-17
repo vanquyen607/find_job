@@ -17,7 +17,9 @@ services:
     dockerfilePath: ./Dockerfile
     healthCheckPath: /api/health
     envVars:
-      - key: ENABLE_BROWSER
-        value: "true"
+      # No ENABLE_BROWSER here on purpose: the browser scrapers are
+      # disabled in code (BROWSER_ENABLED=false) because Chromium does
+      # not fit in the Free plan's 512MB RAM (OOM crash verified live
+      # 2026-11-17). The active sources are API/HTTP only.
       - key: NODE_ENV
         value: production
