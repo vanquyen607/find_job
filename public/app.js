@@ -465,12 +465,17 @@ function showProgress() {
   if (els.progressText) els.progressText.textContent = 'Đang tìm kiếm trên các nền tảng...';
 
   let progress = 8;
+  const startedAt = Date.now();
   clearInterval(progressTimer);
   progressTimer = setInterval(() => {
     progress = Math.min(90, progress + Math.random() * 12);
     if (els.progressFill) els.progressFill.style.width = `${progress}%`;
-    if (els.progressText && progress > 45) {
-      els.progressText.textContent = 'Đang tổng hợp và loại bỏ trùng lặp...';
+    if (els.progressText) {
+      if (Date.now() - startedAt > 8000) {
+        els.progressText.textContent = 'Một số nền tảng phản hồi chậm, vẫn đang tìm thêm...';
+      } else if (progress > 45) {
+        els.progressText.textContent = 'Đang tổng hợp và loại bỏ trùng lặp...';
+      }
     }
   }, 700);
 }
