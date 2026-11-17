@@ -127,24 +127,46 @@ function getMetrics() {
 let browser = null;
 let stealthBrowser = null;
 
+// Chromium cannot read proxy credentials from the standard *_PROXY env
+// vars on its own, so pass them explicitly when the host runs behind a
+// proxy (BROWSER_PROXY overrides; otherwise reuse HTTPS_PROXY/http_proxy).
+function browserProxyOption() {
+  const raw = process.env.BROWSER_PROXY || process.env.HTTPS_PROXY || process.env.https_proxy
+    || process.env.HTTP_PROXY || process.env.http_proxy;
+  if (!raw) return undefined;
+  try {
+    const u = new URL(raw);
+    const option = { server: `${u.protocol}//${u.host}` };
+    if (u.username) option.username = decodeURIComponent(u.username);
+    if (u.password) option.password = decodeURIComponent(u.password);
+    return option;
+  } catch {
+    return undefined;
+  }
+}
+
 async function getBrowser() {
   if (!browser || !browser.isConnected()) {
-    browser = await chromium.launch({ 
+    browser = await chromium.launch({
       headless: true,
+      proxy: browserProxyOption(),
       args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
   }
   return browser;
 }
 
-// Stealth browser for Cloudflare-protected sites
+// Stealth browser for Cloudflare-protected sites.
+// NOTE: must launch via playwrightExtra - the StealthPlugin is registered
+// on it; launching plain `chromium` silently skips every stealth patch.
 async function getStealthBrowser() {
   if (!stealthBrowser || !stealthBrowser.isConnected()) {
     try {
       // Try system Chrome first (bypasses Cloudflare better)
-      stealthBrowser = await chromium.launch({ 
+      stealthBrowser = await playwrightExtra.launch({
         headless: true,
         channel: 'chrome',
+        proxy: browserProxyOption(),
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
@@ -156,8 +178,9 @@ async function getStealthBrowser() {
     } catch (e) {
       // Fallback to bundled Chromium
       console.log('[Browser] Chrome not found, using bundled Chromium');
-      stealthBrowser = await chromium.launch({ 
+      stealthBrowser = await playwrightExtra.launch({
         headless: true,
+        proxy: browserProxyOption(),
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
@@ -175,8 +198,11 @@ async function getJobDetail(job) {
   if (!job.url || job.platform === 'vietnamworks') return job;
 
   try {
-    // Use stealth browser for TopCV (Cloudflare protected)
-    const b = job.platform === 'topcv' ? await getStealthBrowser() : await getBrowser();
+    // Use stealth browser for TopCV (Cloudflare) and ITviec (bot wall:
+    // plain Chromium gets HTTP 403, stealth passes - verified 2026-11-17)
+    const b = (job.platform === 'topcv' || job.platform === 'itviec')
+      ? await getStealthBrowser()
+      : await getBrowser();
     const context = await b.newContext({
       userAgent: getRandomUA(),
       viewport: getRandomViewport(),
@@ -334,12 +360,29 @@ async function batchGetDetails(jobs, maxDetails = 5) {
 
   const updatedByUrl = new Map();
 
-  for (const job of candidates) {
-    console.log(`[Detail] Fetching detail for: ${job.title.substring(0, 50)}...`);
-    const updated = await getJobDetail(job);
-    updatedByUrl.set(job.url, updated);
-    await delay(500);
+  // Fetch details in parallel (small pool) under a global time budget so
+  // enrichment can never dominate total search time.
+  const DETAIL_CONCURRENCY = 3;
+  const DETAIL_BUDGET_MS = parseInt(process.env.DETAIL_BUDGET_MS) || 9000;
+  const startedAt = Date.now();
+  let nextIndex = 0;
+
+  async function detailWorker() {
+    while (nextIndex < candidates.length) {
+      if (Date.now() - startedAt > DETAIL_BUDGET_MS) {
+        console.log('[Detail] Time budget reached, skipping remaining details');
+        break;
+      }
+      const job = candidates[nextIndex++];
+      console.log(`[Detail] Fetching detail for: ${job.title.substring(0, 50)}...`);
+      const updated = await getJobDetail(job);
+      updatedByUrl.set(job.url, updated);
+    }
   }
+
+  await Promise.all(
+    Array.from({ length: Math.min(DETAIL_CONCURRENCY, candidates.length) }, () => detailWorker())
+  );
 
   // Preserve the incoming (relevance-ranked) order.
   return jobs.map(job => updatedByUrl.get(job.url) || job);
@@ -384,8 +427,8 @@ async function scrapeVietnamWorks(keyword) {
       }
 
       const skills = (job.skills || []).map(s => s.skillName).join(', ');
-      const desc = (job.jobDescription || '').replace(/<[^>]*>/g, '').substring(0, 500);
-      const req = (job.jobRequirement || '').replace(/<[^>]*>/g, '').substring(0, 500);
+      const desc = stripHtml(job.jobDescription).substring(0, 500);
+      const req = stripHtml(job.jobRequirement).substring(0, 500);
       const workingLocations = Array.isArray(job.workingLocations) ? job.workingLocations : [];
       const location = job.address || workingLocations
         .map(loc => loc.address || loc.cityNameVI || loc.cityName)
@@ -891,7 +934,8 @@ async function scrapeITviec(keyword) {
   const jobs = [];
 
   try {
-    const b = await getBrowser();
+    // ITviec's bot wall rejects plain Chromium (HTTP 403); stealth passes.
+    const b = await getStealthBrowser();
     const context = await b.newContext({
       userAgent: getRandomUA(),
       viewport: { width: 1920, height: 1080 },
@@ -1003,6 +1047,16 @@ const STOP_WORDS = new Set([
   'va', 'voi', 'cho', 'cua', 'tai', 'trong', 'la', 'cac', 'nhung', 'mot',
   'and', 'or', 'the', 'for', 'with', 'job', 'jobs', 'viec', 'lam'
 ]);
+
+// Strip HTML tags while keeping word boundaries (tags become spaces so
+// adjacent text nodes do not get glued together, e.g. "Summary:We...").
+function stripHtml(html) {
+  return String(html || '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 function normalizeText(value) {
   return String(value || '')

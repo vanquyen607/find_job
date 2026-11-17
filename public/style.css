@@ -17,7 +17,7 @@
   --accent-green: #22c55e;
   --accent-orange: #f59e0b;
   --accent-red: #ef4444;
-  --gradient-brand: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+  --gradient-brand: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%);
 
   --glass-blur: blur(16px);
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
@@ -2101,51 +2101,39 @@ body.menu-open {
 /* Standard hidden attribute support (author display rules would otherwise win) */
 [hidden] { display: none !important; }
 
-/* Landing page: readable contrast over the video background.
-   The inline styles in index.html set dark text globally for .hero-title,
-   so these selectors are scoped with higher specificity. */
-.nexum-landing::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 5;
-  pointer-events: none;
-  background:
-    linear-gradient(90deg, rgba(3, 7, 18, 0.78) 0%, rgba(3, 7, 18, 0.45) 42%, rgba(3, 7, 18, 0.12) 72%),
-    linear-gradient(0deg, rgba(3, 7, 18, 0.55) 0%, rgba(3, 7, 18, 0) 45%);
-}
-
+/* Landing page (light theme): the inline styles in index.html carry the
+   base rules; these scoped overrides pin the light palette with higher
+   specificity so no dark-theme remnants can leak through. */
 .nexum-landing .nav-logo svg {
-  fill: #ffffff;
+  fill: #0284c7;
 }
 
 .nexum-landing .nav-logo span,
 .nexum-landing .testimonial-name,
 .nexum-landing .testimonial-author-name {
-  color: #ffffff;
+  color: #0f172a;
 }
 
 .nexum-landing .hero-title {
-  color: #ffffff;
-  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.35);
+  color: #0f172a;
 }
 
 .nexum-landing .hero-platforms {
-  color: rgba(255, 255, 255, 0.88);
+  color: #64748b;
 }
 
 .nexum-landing .glass-card {
-  background: rgba(8, 15, 30, 0.55);
-  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(15, 23, 42, 0.07);
 }
 
 .nexum-landing .stat-body,
 .nexum-landing .testimonial-quote {
-  color: rgba(255, 255, 255, 0.86);
+  color: #475569;
 }
 
 .nexum-landing .testimonial-author-role {
-  color: rgba(255, 255, 255, 0.62);
+  color: #94a3b8;
 }
 
 @media (max-width: 720px) {
