@@ -1,0 +1,23 @@
+# Render Blueprint — FindJob as a Docker web service.
+# The browser scrapers (Glints, ITviec, TopCV) need Chromium plus its
+# system libraries, which only the Docker image provides (see Dockerfile).
+# A native Node service on Render cannot run them.
+#
+# How to use: Render Dashboard -> New -> Blueprint (or New Web Service ->
+# Docker), pick this repo + the branch below. Render cannot convert the
+# existing native service in place, so this creates a new service with a
+# new URL; verify it, then delete the old native one.
+services:
+  - type: web
+    name: find-job-docker
+    runtime: docker
+    plan: free
+    region: singapore
+    branch: fix/search-speed-scrapers-landing
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: ENABLE_BROWSER
+        value: "true"
+      - key: NODE_ENV
+        value: production

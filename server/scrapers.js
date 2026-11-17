@@ -150,7 +150,9 @@ async function getBrowser() {
     browser = await chromium.launch({
       headless: true,
       proxy: browserProxyOption(),
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      // --disable-dev-shm-usage is required in Docker: /dev/shm defaults
+      // to 64MB there and Chromium tabs crash without it.
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
     });
   }
   return browser;
@@ -170,6 +172,7 @@ async function getStealthBrowser() {
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
           '--disable-blink-features=AutomationControlled',
           '--disable-features=IsolateOrigins,site-per-process'
         ]
@@ -184,6 +187,7 @@ async function getStealthBrowser() {
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
           '--disable-blink-features=AutomationControlled',
           '--disable-features=IsolateOrigins,site-per-process'
         ]

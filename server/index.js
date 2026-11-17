@@ -3,20 +3,13 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
-const { scrapeAll, scrapeJobDetail, closeBrowser, getMetrics } = require('./scrapers');
-const { extractUser, requireAuth, requireAdmin } = require('./auth');
-const { initDb, saveJobs, saveSearchHistory, cleanupExpiredJobs, closeDb } = require('./database');
+const { scrapeAll, scrapeJobDetail, closeBrowser } = require('./scrapers');
 const {
   createRateLimiter,
   isAllowedJobUrl,
   isUrlForPlatform,
   sanitizeText
 } = require('./security');
-
-// Import routes
-const authRoutes = require('./routes/auth');
-const savedJobsRoutes = require('./routes/savedJobs');
-const adminRoutes = require('./routes/admin');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -43,7 +36,6 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
       fontSrc: ["'self'", 'https://fonts.gstatic.com'],
       imgSrc: ["'self'", 'data:', 'https:'],
-      mediaSrc: ["'self'", 'https://d8j0ntlcm91z4.cloudfront.net'],
       connectSrc: ["'self'"],
       objectSrc: ["'none'"],
       frameAncestors: ["'none'"],
@@ -60,15 +52,12 @@ app.use(helmet({
 const corsOrigin = process.env.CORS_ORIGIN;
 app.use(cors({
   origin: corsOrigin || false,
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET'],
+  allowedHeaders: ['Content-Type']
 }));
 
 app.use(express.json({ limit: '256kb' }));
 app.use(express.static(path.join(__dirname, '../public')));
-
-// Extract user from token (optional - for all requests)
-app.use(extractUser);
 
 // ==================== RATE LIMITING ====================
 const searchLimiter = createRateLimiter({
@@ -84,8 +73,9 @@ const detailLimiter = createRateLimiter({
 });
 
 // ==================== ROUTES ====================
+// No accounts, no database: the site is open-access and stateless.
+// Saved jobs live in each visitor's browser (localStorage).
 
-// Health check
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -94,12 +84,6 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Metrics (admin only)
-app.get('/api/metrics', requireAuth, requireAdmin, (req, res) => {
-  res.json(getMetrics());
-});
-
-// Search API
 app.get('/api/search', searchLimiter, async (req, res) => {
   const q = typeof req.query.q === 'string' ? sanitizeText(req.query.q, 100) : '';
 
@@ -114,20 +98,6 @@ app.get('/api/search', searchLimiter, async (req, res) => {
     const jobs = await withTimeout(scrapeAll(q), 90000, 'Search API');
     const duration = Date.now() - startTime;
 
-    try {
-      saveJobs(jobs);
-    } catch (e) {
-      console.error('[SEARCH] Failed to save jobs to DB:', e.message);
-    }
-
-    if (req.user) {
-      try {
-        saveSearchHistory(req.user.id, q, jobs.length);
-      } catch (e) {
-        console.error('[SEARCH] Failed to save search history:', e.message);
-      }
-    }
-
     console.log(`[SEARCH] Found ${jobs.length} jobs in ${duration}ms`);
     res.json({ jobs, total: jobs.length, duration, cached: false });
   } catch (error) {
@@ -136,7 +106,6 @@ app.get('/api/search', searchLimiter, async (req, res) => {
   }
 });
 
-// Job Detail API
 app.get('/api/job-detail', detailLimiter, async (req, res) => {
   const url = typeof req.query.url === 'string' ? sanitizeText(req.query.url, 2048) : '';
   const platform = typeof req.query.platform === 'string'
@@ -161,11 +130,6 @@ app.get('/api/job-detail', detailLimiter, async (req, res) => {
     res.status(500).json({ error: 'Không thể tải chi tiết việc làm' });
   }
 });
-
-// ==================== AUTH & USER ROUTES ====================
-app.use('/api/auth', authRoutes);
-app.use('/api/saved-jobs', savedJobsRoutes);
-app.use('/api/admin', adminRoutes);
 
 // Unknown API routes should return JSON, not the SPA shell
 app.use('/api', (req, res) => {
@@ -197,8 +161,7 @@ app.use((err, req, res, next) => {
 const shutdown = async (signal) => {
   console.log(`\n[SHUTDOWN] Received ${signal}. Starting graceful shutdown...`);
   await closeBrowser();
-  closeDb();
-  console.log('[SHUTDOWN] Browser and database closed. Exiting.');
+  console.log('[SHUTDOWN] Browser closed. Exiting.');
   process.exit(0);
 };
 
@@ -213,39 +176,14 @@ process.on('unhandledRejection', (reason) => {
 });
 
 // ==================== START SERVER ====================
-async function start() {
-  await initDb();
-
-  try {
-    const removed = cleanupExpiredJobs();
-    console.log(`[DB] Expired jobs cleanup done (${removed} removed)`);
-  } catch (e) {
-    console.error('[DB] Cleanup failed:', e.message);
-  }
-
-  const cleanupTimer = setInterval(() => {
-    try {
-      cleanupExpiredJobs();
-    } catch (e) {
-      console.error('[DB] Scheduled cleanup failed:', e.message);
-    }
-  }, 60 * 60 * 1000);
-  cleanupTimer.unref();
-
-  app.listen(PORT, () => {
-    console.log(`
+app.listen(PORT, () => {
+  console.log(`
     ╔══════════════════════════════════════════════╗
-    ║   FindJob Server v1.0                        ║
+    ║   FindJob Server v2.0 (open, stateless)      ║
     ║   Port: ${PORT}                                 ║
     ║   URL: http://localhost:${PORT}                  ║
     ║   Cache: 30 min TTL                          ║
     ║   Search limit: 10 req/min                   ║
     ╚══════════════════════════════════════════════╝
     `);
-  });
-}
-
-start().catch(err => {
-  console.error('[FATAL] Failed to start:', err);
-  process.exit(1);
 });

@@ -1818,110 +1818,11 @@
   </style>
 </head>
 <body>
-  <!-- ==================== LANDING PAGE (Public) ==================== -->
-  <div id="landing-page" class="nexum-landing">
-    <div class="nexum-video nexum-backdrop" aria-hidden="true"></div>
-
-    <div class="nexum-content">
-      <!-- Nav -->
-      <nav class="nexum-nav">
-        <div class="nav-inner">
-          <a href="/" class="nav-logo">
-            <svg viewBox="0 0 256 256" fill="currentColor">
-              <path d="M 128 128 C 128 198.692 70.692 256 0 256 C 0 185.308 57.308 128 128 128 Z M 128 128 C 198.692 128 256 185.308 256 256 C 185.308 256 128 198.692 128 128 Z M 0 0 C 70.692 0 128 57.308 128 128 C 57.308 128 0 70.692 0 0 Z M 256 0 C 256 70.692 198.692 128 128 128 C 128 57.308 185.308 0 256 0 Z" />
-            </svg>
-            <span>findjob</span>
-          </a>
-
-          <!-- Desktop nav -->
-          <div class="nav-desktop" id="landing-nav">
-            <a href="/login.html" class="btn-cta-nav">Đăng nhập</a>
-            <a href="/register.html" class="btn-cta-nav">Đăng ký</a>
-          </div>
-
-          <!-- Mobile hamburger -->
-          <button type="button" class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Mở menu" aria-expanded="false" aria-controls="mobile-drawer">
-            <svg class="icon-menu" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="4" x2="20" y1="12" y2="12"/>
-              <line x1="4" x2="20" y1="6" y2="6"/>
-              <line x1="4" x2="20" y1="18" y2="18"/>
-            </svg>
-            <svg class="icon-close" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M18 6 6 18"/>
-              <path d="m6 6 12 12"/>
-            </svg>
-          </button>
-        </div>
-      </nav>
-
-      <!-- Mobile overlay -->
-      <div class="mobile-overlay" id="mobile-overlay" data-action="close-mobile-menu"></div>
-
-      <!-- Mobile drawer -->
-      <div class="mobile-drawer" id="mobile-drawer" aria-hidden="true">
-        <div class="mobile-drawer-links">
-          <a href="/login.html" class="mobile-drawer-link">Đăng nhập</a>
-          <a href="/register.html" class="mobile-drawer-link">Đăng ký</a>
-        </div>
-        <div class="mobile-drawer-cta">
-          <a href="/register.html">Bắt đầu ngay</a>
-        </div>
-      </div>
-
-      <!-- Main content -->
-      <main class="nexum-main">
-        <div class="hero-left">
-          <h1 class="hero-title">Tìm kiếm việc làm thông minh từ 5 nền tảng</h1>
-          <p class="hero-platforms">VietnamWorks · CareerViet · ITviec · Glints · TopCV</p>
-
-          <form class="email-cta" id="email-cta-form" novalidate>
-            <label for="signup-email" class="sr-only">Email của bạn</label>
-            <input
-              type="email"
-              id="signup-email"
-              name="email"
-              placeholder="Nhập email của bạn"
-              class="email-input"
-              autocomplete="email"
-            />
-            <button type="submit" class="btn-cta-main">Bắt đầu ngay</button>
-          </form>
-        </div>
-
-        <div class="glass-cards">
-          <!-- Stats card -->
-          <div class="glass-card">
-            <div class="stat-number">5+</div>
-            <p class="stat-body">Nền tảng việc làm lớn nhất Việt Nam được tích hợp sẵn.</p>
-          </div>
-
-          <!-- Testimonial card -->
-          <div class="glass-card">
-            <div class="testimonial-header">
-              <div class="testimonial-icon">F</div>
-              <span class="testimonial-name">FindJob</span>
-            </div>
-            <p class="testimonial-quote">
-              "Từ khi sử dụng FindJob, tôi tìm được việc nhanh hơn gấp nhiều lần so với việc phải mở từng trang web riêng lẻ."
-            </p>
-            <div class="testimonial-footer">
-              <div class="testimonial-avatar testimonial-avatar--initials" aria-hidden="true">MT</div>
-              <div>
-                <p class="testimonial-author-name">Minh Tuấn</p>
-                <p class="testimonial-author-role">Frontend Developer</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
-    </div>
-  </div>
-
-  <!-- ==================== APP PAGE (Protected - After Login) ==================== -->
-  <div id="app-page" class="app-page hidden">
+  <!-- ==================== APP (trang chủ = trang tìm việc) ==================== -->
+  <div id="app-page" class="app-page">
     <header class="app-header">
       <div class="app-header-inner">
-        <a href="/" class="app-logo" data-action="show-landing" aria-label="FindJob - về trang giới thiệu">
+        <a href="/" class="app-logo" aria-label="FindJob - trang chủ">
           <svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">
             <path d="M 128 128 C 128 198.692 70.692 256 0 256 C 0 185.308 57.308 128 128 128 Z M 128 128 C 198.692 128 256 185.308 256 256 C 185.308 256 128 198.692 128 128 Z M 0 0 C 70.692 0 128 57.308 128 128 C 57.308 128 0 70.692 0 0 Z M 256 0 C 256 70.692 198.692 128 128 128 C 128 57.308 185.308 0 256 0 Z" />
           </svg>
@@ -1932,46 +1833,13 @@
             <span class="stat-item"><span class="stat-number" id="total-jobs">0</span> việc làm</span>
             <span class="stat-item"><span class="stat-number">5</span> nền tảng</span>
           </div>
-          <div class="user-menu" id="user-menu">
-            <button type="button" class="user-menu-btn" data-action="toggle-user-menu" aria-haspopup="true" aria-expanded="false" aria-controls="user-dropdown">
-              <span class="user-avatar" id="user-avatar">U</span>
-              <span class="user-name" id="user-name">User</span>
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path d="m6 9 6 6 6-6"/>
-              </svg>
-            </button>
-            <div class="user-dropdown hidden" id="user-dropdown" role="menu">
-              <a href="#" role="menuitem" data-action="show-saved-jobs">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
-                </svg>
-                Việc đã lưu
-              </a>
-              <a href="#" role="menuitem" data-action="show-search-history">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <polyline points="12 6 12 12 16 14"></polyline>
-                </svg>
-                Lịch sử tìm kiếm
-              </a>
-              <a href="/admin.html" class="admin-link" id="admin-link" role="menuitem" hidden>
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                  <circle cx="12" cy="12" r="3"></circle>
-                  <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
-                </svg>
-                Admin Dashboard
-              </a>
-              <hr>
-              <a href="#" role="menuitem" data-action="logout" class="logout-link">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                  <polyline points="16 17 21 12 16 7"></polyline>
-                  <line x1="21" y1="12" x2="9" y2="12"></line>
-                </svg>
-                Đăng xuất
-              </a>
-            </div>
-          </div>
+          <button type="button" class="btn-saved-header" data-action="show-saved-jobs">
+            <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <span class="btn-saved-label">Việc đã lưu</span>
+            <span class="saved-count" id="saved-count" hidden>0</span>
+          </button>
         </div>
       </div>
     </header>
