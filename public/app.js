@@ -15,12 +15,10 @@ const VISIBLE_PER_PLATFORM = 6;
 const RECENT_SEARCH_LIMIT = 6;
 
 const state = {
-  token: readToken(),
-  user: null,
   jobs: [],
   filtered: [],
   compare: [],
-  savedJobIds: new Map(),
+  savedJobIds: new Set(),
   savedJobs: [],
   expandedPlatforms: new Set(),
   collapsedPlatforms: new Set(),
@@ -39,14 +37,11 @@ function init() {
   const toastRegion = document.getElementById('toast-region');
   if (toastRegion) document.body.appendChild(toastRegion);
   bindGlobalEvents();
-  updateAuthButton();
+  loadSavedJobs();
   renderRecentSearches();
-  checkAuth();
 }
 
 function cacheElements() {
-  els.landing = document.getElementById('landing-page');
-  els.app = document.getElementById('app-page');
   els.searchInput = document.getElementById('search-input');
   els.searchBtn = document.getElementById('search-btn');
   els.btnText = els.searchBtn?.querySelector('.btn-text');
@@ -67,11 +62,6 @@ function cacheElements() {
   els.progressFill = document.getElementById('progress-fill');
   els.progressText = document.getElementById('progress-text');
   els.recentSearches = document.getElementById('recent-searches');
-  els.userMenu = document.getElementById('user-menu');
-  els.userDropdown = document.getElementById('user-dropdown');
-  els.userName = document.getElementById('user-name');
-  els.userAvatar = document.getElementById('user-avatar');
-  els.adminLink = document.getElementById('admin-link');
   els.savedModal = document.getElementById('saved-jobs-modal');
   els.savedList = document.getElementById('saved-jobs-list');
   els.compareModal = document.getElementById('compare-modal');
@@ -80,20 +70,9 @@ function cacheElements() {
   els.mobileBtn = document.getElementById('mobile-menu-btn');
   els.mobileOverlay = document.getElementById('mobile-overlay');
   els.mobileDrawer = document.getElementById('mobile-drawer');
-  els.emailForm = document.getElementById('email-cta-form');
-  els.signupEmail = document.getElementById('signup-email');
-  els.landingNav = document.getElementById('landing-nav');
 }
 
 // ==================== HELPERS ====================
-
-function readToken() {
-  try {
-    return localStorage.getItem('authToken');
-  } catch {
-    return null;
-  }
-}
 
 function loadRecentSearches() {
   try {
@@ -145,23 +124,6 @@ function platformColor(platform) {
   return PLATFORM_META[platform]?.color || '#4f46e5';
 }
 
-function authHeaders(extra = {}) {
-  const headers = { ...extra };
-  if (state.token) headers.Authorization = `Bearer ${state.token}`;
-  return headers;
-}
-
-async function apiFetch(path, options = {}) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: authHeaders(options.headers || {})
-  });
-  if (res.status === 401 && state.user) {
-    logout(false);
-  }
-  return res;
-}
-
 function announce(message) {
   if (els.srStatus) els.srStatus.textContent = message;
 }
@@ -184,122 +146,7 @@ function showToast(message, type = 'info') {
   setTimeout(() => toast.remove(), 3200);
 }
 
-// ==================== AUTH ====================
-
-async function checkAuth() {
-  if (!state.token) {
-    showLanding();
-    return;
-  }
-
-  try {
-    const res = await fetch(`${API_BASE}/api/auth/me`, { headers: authHeaders() });
-    if (!res.ok) throw new Error('unauthenticated');
-    const data = await res.json();
-    state.user = data.user;
-    showApp();
-    updateAuthButton();
-    loadSavedJobIds();
-  } catch {
-    clearSession();
-    showLanding();
-  }
-}
-
-function clearSession() {
-  state.token = null;
-  state.user = null;
-  state.savedJobIds.clear();
-  state.savedJobs = [];
-  state.compare = [];
-  try {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('currentUser');
-  } catch {
-    /* storage unavailable */
-  }
-}
-
-function updateAuthButton() {
-  if (!els.userMenu) return;
-  if (state.user) {
-    els.userMenu.hidden = false;
-    if (els.userName) els.userName.textContent = state.user.name || state.user.email;
-    if (els.userAvatar) {
-      els.userAvatar.textContent = (state.user.name || state.user.email || 'U').charAt(0).toUpperCase();
-    }
-    if (els.adminLink) els.adminLink.hidden = state.user.role !== 'admin';
-    if (els.landingNav) {
-      els.landingNav.innerHTML = '<a href="#" class="btn-cta-nav" data-action="show-app">Vào ứng dụng</a>';
-    }
-    const drawerLinks = document.querySelector('.mobile-drawer-links');
-    const drawerCta = document.querySelector('.mobile-drawer-cta');
-    if (drawerLinks) {
-      drawerLinks.innerHTML = `
-        <a href="#" class="mobile-drawer-link" data-action="show-app">Vào ứng dụng</a>
-        <a href="#" class="mobile-drawer-link" data-action="logout">Đăng xuất</a>
-      `;
-    }
-    if (drawerCta) drawerCta.hidden = true;
-  } else {
-    els.userMenu.hidden = true;
-    if (els.landingNav) {
-      els.landingNav.innerHTML = `
-        <a href="/login.html" class="btn-cta-nav">Đăng nhập</a>
-        <a href="/register.html" class="btn-cta-nav">Đăng ký</a>
-      `;
-    }
-    const drawerLinks = document.querySelector('.mobile-drawer-links');
-    const drawerCta = document.querySelector('.mobile-drawer-cta');
-    if (drawerLinks) {
-      drawerLinks.innerHTML = `
-        <a href="/login.html" class="mobile-drawer-link">Đăng nhập</a>
-        <a href="/register.html" class="mobile-drawer-link">Đăng ký</a>
-      `;
-    }
-    if (drawerCta) drawerCta.hidden = false;
-  }
-}
-
-function logout(notify = true) {
-  clearSession();
-  state.jobs = [];
-  state.filtered = [];
-  state.lastQuery = '';
-  if (els.resultsContainer) els.resultsContainer.innerHTML = '';
-  closeUserMenu();
-  updateAuthButton();
-  showLanding();
-  if (notify) showToast('Đã đăng xuất');
-}
-
 // ==================== NAVIGATION ====================
-
-function showLanding() {
-  els.landing?.classList.remove('hidden');
-  els.app?.classList.add('hidden');
-  closeUserMenu();
-  closeMobileMenu();
-}
-
-function showApp() {
-  els.landing?.classList.add('hidden');
-  els.app?.classList.remove('hidden');
-  closeMobileMenu();
-}
-
-function closeUserMenu() {
-  els.userDropdown?.classList.add('hidden');
-  els.userMenu?.querySelector('.user-menu-btn')?.setAttribute('aria-expanded', 'false');
-}
-
-function toggleUserMenu() {
-  if (!els.userDropdown) return;
-  const willOpen = els.userDropdown.classList.contains('hidden');
-  els.userDropdown.classList.toggle('hidden', !willOpen);
-  els.userMenu?.querySelector('.user-menu-btn')?.setAttribute('aria-expanded', String(willOpen));
-  if (willOpen) els.userDropdown.querySelector('a')?.focus();
-}
 
 function openMobileMenu() {
   els.mobileBtn?.classList.add('open');
@@ -411,7 +258,7 @@ async function performSearch(rawQuery) {
 
     hideProgress();
     applyFilters();
-    await loadSavedJobIds();
+    refreshSaveButtons();
     scrollToResults();
   } catch (err) {
     if (err.name === 'AbortError') return;
@@ -970,20 +817,27 @@ async function copyToClipboard(text) {
   }
 }
 
-// ==================== SAVED JOBS ====================
+// ==================== SAVED JOBS (localStorage) ====================
+// No accounts: saved jobs live in the visitor's own browser.
 
-async function loadSavedJobIds() {
-  if (!state.user) return;
+const SAVED_JOBS_KEY = 'findjob_saved_jobs';
+
+function loadSavedJobs() {
   try {
-    const res = await apiFetch('/api/saved-jobs');
-    if (!res.ok) return;
-    const data = await res.json();
-    const jobs = Array.isArray(data.jobs) ? data.jobs : [];
-    state.savedJobs = jobs;
-    state.savedJobIds = new Map(jobs.map((job) => [job.url, job.id]));
-    refreshSaveButtons();
+    const parsed = JSON.parse(localStorage.getItem(SAVED_JOBS_KEY) || '[]');
+    state.savedJobs = Array.isArray(parsed) ? parsed.filter((job) => job && job.url) : [];
   } catch {
-    /* ignore */
+    state.savedJobs = [];
+  }
+  state.savedJobIds = new Set(state.savedJobs.map((job) => job.url));
+  refreshSaveButtons();
+}
+
+function persistSavedJobs() {
+  try {
+    localStorage.setItem(SAVED_JOBS_KEY, JSON.stringify(state.savedJobs));
+  } catch {
+    /* storage unavailable */
   }
 }
 
@@ -994,6 +848,14 @@ function refreshSaveButtons() {
     const saved = state.savedJobIds.has(card.dataset.url);
     setSaveButtonState(btn, saved);
   });
+  updateSavedCount();
+}
+
+function updateSavedCount() {
+  const badge = document.getElementById('saved-count');
+  if (!badge) return;
+  badge.textContent = String(state.savedJobs.length);
+  badge.hidden = state.savedJobs.length === 0;
 }
 
 function setSaveButtonState(btn, saved) {
@@ -1002,57 +864,23 @@ function setSaveButtonState(btn, saved) {
   btn.innerHTML = saveButtonContent(saved);
 }
 
-async function toggleSaveJob(job, btn) {
-  if (!state.user) {
-    window.location.href = '/login.html';
+function toggleSaveJob(job, btn) {
+  if (state.savedJobIds.has(job.url)) {
+    state.savedJobs = state.savedJobs.filter((item) => item.url !== job.url);
+    state.savedJobIds.delete(job.url);
+    persistSavedJobs();
+    refreshSaveButtons();
+    if (btn) setSaveButtonState(btn, false);
+    showToast('Đã bỏ lưu việc làm');
     return;
   }
 
-  const existingId = state.savedJobIds.get(job.url);
-  btn.disabled = true;
-
-  try {
-    if (existingId) {
-      const res = await apiFetch(`/api/saved-jobs/${existingId}`, { method: 'DELETE' });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        showToast(data.error || 'Không thể bỏ lưu', 'error');
-        return;
-      }
-      state.savedJobIds.delete(job.url);
-      refreshSaveButtons();
-      setSaveButtonState(btn, false);
-      showToast('Đã bỏ lưu việc làm');
-      return;
-    }
-
-    const res = await apiFetch('/api/saved-jobs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jobUrl: job.url, jobData: pickJobFields(job) })
-    });
-    const data = await res.json().catch(() => ({}));
-
-    if (res.ok) {
-      state.savedJobIds.set(job.url, data.jobId);
-      refreshSaveButtons();
-      setSaveButtonState(btn, true);
-      showToast('Đã lưu việc làm');
-      return;
-    }
-
-    if (res.status === 409) {
-      await loadSavedJobIds();
-      showToast('Việc này đã được lưu');
-      return;
-    }
-
-    showToast(data.error || 'Không thể lưu việc làm', 'error');
-  } catch {
-    showToast('Có lỗi xảy ra', 'error');
-  } finally {
-    btn.disabled = false;
-  }
+  state.savedJobs.unshift(pickJobFields(job));
+  state.savedJobIds.add(job.url);
+  persistSavedJobs();
+  refreshSaveButtons();
+  if (btn) setSaveButtonState(btn, true);
+  showToast('Đã lưu việc làm');
 }
 
 function pickJobFields(job) {
@@ -1070,32 +898,10 @@ function pickJobFields(job) {
   };
 }
 
-async function showSavedJobs() {
-  closeUserMenu();
-  if (!state.user) {
-    window.location.href = '/login.html';
-    return;
-  }
-
+function showSavedJobs() {
   openStaticModal(els.savedModal);
-  if (els.savedList) {
-    els.savedList.innerHTML = '<div class="loading"><div class="loading-spinner" aria-hidden="true"></div><p>Đang tải...</p></div>';
-  }
-
-  try {
-    const res = await apiFetch('/api/saved-jobs');
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || 'Không thể tải danh sách');
-
-    state.savedJobs = Array.isArray(data.jobs) ? data.jobs : [];
-    state.savedJobIds = new Map(state.savedJobs.map((job) => [job.url, job.id]));
-    renderSavedJobs();
-    refreshSaveButtons();
-  } catch (error) {
-    if (els.savedList) {
-      els.savedList.innerHTML = `<div class="empty-state"><p>${escapeHtml(error.message)}</p></div>`;
-    }
-  }
+  renderSavedJobs();
+  refreshSaveButtons();
 }
 
 function renderSavedJobs() {
@@ -1121,68 +927,20 @@ function renderSavedJobs() {
       </div>
       <div class="saved-job-actions">
         <button type="button" class="btn-view-saved" data-action="view-saved">Xem</button>
-        <button type="button" class="btn-remove-saved" data-action="remove-saved" data-job-id="${Number(job.id) || ''}">Xóa</button>
+        <button type="button" class="btn-remove-saved" data-action="remove-saved">Xóa</button>
       </div>
     </div>
   `).join('');
 }
 
-async function removeSavedJob(jobId) {
-  if (!jobId) return;
-  try {
-    const res = await apiFetch(`/api/saved-jobs/${jobId}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error();
-    state.savedJobIds.forEach((id, url) => {
-      if (id === jobId) state.savedJobIds.delete(url);
-    });
-    await showSavedJobs();
-    refreshSaveButtons();
-    showToast('Đã xóa khỏi danh sách lưu');
-  } catch {
-    showToast('Không thể xóa', 'error');
-  }
-}
-
-async function showSearchHistory() {
-  closeUserMenu();
-  if (!state.user) {
-    window.location.href = '/login.html';
-    return;
-  }
-
-  const { modal } = buildModal({
-    title: 'Lịch sử tìm kiếm',
-    className: 'history-modal'
-  });
-  const body = modal.querySelector('.modal-body');
-  body.innerHTML = '<div class="loading"><div class="loading-spinner" aria-hidden="true"></div><p>Đang tải...</p></div>';
-
-  try {
-    const res = await apiFetch('/api/saved-jobs/history');
-    const data = await res.json().catch(() => ({}));
-    const history = Array.isArray(data.history) ? data.history : [];
-
-    if (history.length === 0) {
-      body.innerHTML = '<div class="empty-state"><p>Chưa có lịch sử tìm kiếm</p></div>';
-      return;
-    }
-
-    body.innerHTML = history.map((item) => `
-      <button type="button" class="history-item" data-query="${escapeHtml(item.keyword)}">
-        <span class="history-keyword">${escapeHtml(item.keyword)}</span>
-        <span class="history-meta">${Number(item.results_count) || 0} kết quả · ${escapeHtml(formatDate(item.searched_at))}</span>
-      </button>
-    `).join('');
-  } catch {
-    body.innerHTML = '<div class="empty-state"><p>Không thể tải lịch sử</p></div>';
-  }
-}
-
-function formatDate(value) {
-  if (!value) return '';
-  const date = new Date(String(value).replace(' ', 'T'));
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+function removeSavedJob(jobUrl) {
+  if (!jobUrl) return;
+  state.savedJobs = state.savedJobs.filter((job) => job.url !== jobUrl);
+  state.savedJobIds.delete(jobUrl);
+  persistSavedJobs();
+  renderSavedJobs();
+  refreshSaveButtons();
+  showToast('Đã xóa khỏi danh sách lưu');
 }
 
 // ==================== COMPARE ====================
@@ -1357,7 +1115,6 @@ function bindGlobalEvents() {
   document.addEventListener('change', handleGlobalChange);
 
   els.mobileBtn?.addEventListener('click', toggleMobileMenu);
-  els.emailForm?.addEventListener('submit', handleEmailCta);
 
   els.searchBtn?.addEventListener('click', () => performSearch());
   els.searchInput?.addEventListener('keydown', (event) => {
@@ -1379,9 +1136,6 @@ function bindGlobalEvents() {
   els.resultsContainer?.addEventListener('keydown', handleResultsKeydown);
 
   els.savedList?.addEventListener('click', handleSavedListClick);
-  els.userMenu?.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') closeUserMenu();
-  });
 }
 
 function handleGlobalClick(event) {
@@ -1404,39 +1158,19 @@ function handleGlobalClick(event) {
 
   const actionEl = event.target.closest('[data-action]');
 
-  if (!actionEl) {
-    if (els.userMenu && !els.userMenu.contains(event.target)) closeUserMenu();
-    return;
-  }
+  if (!actionEl) return;
 
   const action = actionEl.dataset.action;
 
-  if (['show-saved-jobs', 'show-search-history', 'logout', 'show-landing', 'toggle-user-menu',
+  if (['show-saved-jobs',
     'show-compare', 'export-csv', 'toggle-advanced-filters', 'retry-search', 'close-mobile-menu',
     'clear-recent'].includes(action)) {
     event.preventDefault();
   }
 
   switch (action) {
-    case 'show-landing':
-      showLanding();
-      break;
-    case 'show-app':
-      event.preventDefault();
-      showApp();
-      els.searchInput?.focus();
-      break;
-    case 'toggle-user-menu':
-      toggleUserMenu();
-      break;
     case 'show-saved-jobs':
       showSavedJobs();
-      break;
-    case 'show-search-history':
-      showSearchHistory();
-      break;
-    case 'logout':
-      logout();
       break;
     case 'close-mobile-menu':
       closeMobileMenu();
@@ -1480,7 +1214,6 @@ function handleGlobalKeydown(event) {
 
   if ((event.ctrlKey || event.metaKey) && (event.key === 'k' || event.key === 'K')) {
     event.preventDefault();
-    showApp();
     els.searchInput?.focus();
     return;
   }
@@ -1491,14 +1224,13 @@ function handleGlobalKeydown(event) {
     return;
   }
 
-  if (event.key === '/' && !isTyping && state.user
+  if (event.key === '/' && !isTyping
     && !document.querySelector('.modal-backdrop:not(.hidden)')) {
     event.preventDefault();
     els.searchInput?.focus();
   }
 
   if (event.key === 'Escape') {
-    closeUserMenu();
     closeMobileMenu();
   }
 }
@@ -1598,7 +1330,7 @@ function handleSavedListClick(event) {
   if (!item) return;
 
   if (actionEl.dataset.action === 'remove-saved') {
-    removeSavedJob(Number(actionEl.dataset.jobId));
+    removeSavedJob(item.dataset.url);
     return;
   }
 
@@ -1609,24 +1341,6 @@ function handleSavedListClick(event) {
       openJobDetail(saved);
     }
   }
-}
-
-function handleEmailCta(event) {
-  event.preventDefault();
-  const email = String(els.signupEmail?.value || '').trim();
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    showToast('Email không hợp lệ', 'error');
-    els.signupEmail?.focus();
-    return;
-  }
-  if (email) {
-    try {
-      sessionStorage.setItem('signupEmail', email);
-    } catch {
-      /* storage unavailable */
-    }
-  }
-  window.location.href = '/register.html';
 }
 
 function findJobByUrl(url) {
