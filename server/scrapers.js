@@ -8,6 +8,14 @@ const { isAllowedJobUrl } = require('./security');
 // Add stealth plugin
 playwrightExtra.use(StealthPlugin());
 
+// Browser scrapers (Glints / ITviec / TopCV) and browser-based detail
+// enrichment are DISABLED in code on purpose (owner decision 2026-11-17):
+// on Render's Free plan (512MB RAM) launching Chromium crashed the service
+// mid-search (instance exceeded its memory limit and restarted). The
+// ENABLE_BROWSER env var is therefore ignored. Only flip this to true on
+// an instance with >= 2GB RAM.
+const BROWSER_ENABLED = false;
+
 // ==================== CONFIG ====================
 const USER_AGENTS = [
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -200,6 +208,9 @@ async function getStealthBrowser() {
 // ==================== GET JOB DETAIL ====================
 async function getJobDetail(job) {
   if (!job.url || job.platform === 'vietnamworks') return job;
+  // No browser on small instances (see BROWSER_ENABLED note at the top):
+  // jobs keep the description captured during search.
+  if (!BROWSER_ENABLED) return job;
 
   try {
     // Use stealth browser for TopCV (Cloudflare) and ITviec (bot wall:
@@ -932,6 +943,65 @@ async function scrapeCareerViet(keyword) {
   return jobs;
 }
 
+// ==================== CHOTOT (Public API) ✅ ====================
+// Cho Tot exposes a public JSON API for its job category (cg=13000) -
+// no browser needed, so it runs fine on small instances. Ads carry the
+// full body text, salary string and company name inline.
+function softenCaps(text) {
+  const s = String(text || '');
+  const letters = s.replace(/[^A-Za-zÀ-ỹ]/g, '');
+  if (!letters) return s.trim();
+  const upper = letters.replace(/[^A-ZÀ-Ỹ]/g, '').length;
+  if (upper / letters.length < 0.8) return s.trim();
+  const lower = s.toLowerCase();
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
+}
+
+function formatChoTotSalary(ad) {
+  if (ad.price_string) return ad.price_string;
+  const fmt = (v) => {
+    if (!v) return '';
+    if (v >= 1e6) return `${(Math.round(v / 1e5) / 10).toString().replace('.', ',')} triệu`;
+    return `${Math.round(v / 1e3)} nghìn`;
+  };
+  const parts = [fmt(ad.min_salary), fmt(ad.max_salary)].filter(Boolean);
+  return parts.length ? `${parts.join(' - ')}/tháng` : '';
+}
+
+async function scrapeChoTot(keyword) {
+  console.log('[ChoTot] Starting...');
+  const jobs = [];
+
+  try {
+    const { data } = await axios.get('https://gateway.chotot.com/v1/public/ad-listing', {
+      params: { cg: 13000, q: keyword, limit: 30 },
+      headers: { 'User-Agent': getRandomUA() },
+      timeout: 15000
+    });
+
+    for (const ad of data?.ads || []) {
+      if (!ad.subject || !ad.ad_id) continue;
+      const location = [ad.area_name, ad.region_name].filter(Boolean).join(', ');
+      jobs.push({
+        title: softenCaps(ad.subject),
+        company: ad.company_name || ad.account_name || '',
+        location,
+        salary: formatChoTotSalary(ad),
+        experience: '',
+        description: stripHtml(ad.body || '').slice(0, 1500),
+        url: `https://www.chotot.com/viec-lam/${ad.ad_id}.htm`,
+        platform: 'chotot'
+      });
+    }
+
+    console.log(`[ChoTot] Found ${jobs.length} jobs`);
+  } catch (e) {
+    console.error('[ChoTot] Error:', e.message);
+  }
+
+  return jobs;
+}
+
 // ==================== ITVIC (Playwright) ✅ ====================
 async function scrapeITviec(keyword) {
   console.log('[ITviec] Starting...');
@@ -1168,11 +1238,12 @@ async function scrapeAll(keyword) {
 
   const SCRAPE_TIMEOUT = parseInt(process.env.SCRAPE_TIMEOUT) || 40000;
   const MAX_JOBS_PER_PLATFORM = parseInt(process.env.MAX_JOBS_PER_PLATFORM) || 20;
-  const ENABLE_BROWSER = process.env.ENABLE_BROWSER === 'true';
-  
+  const ENABLE_BROWSER = BROWSER_ENABLED;
+
   const httpScrapers = [
     { name: 'VietnamWorks', fn: scrapeVietnamWorks },
-    { name: 'CareerViet', fn: scrapeCareerViet }
+    { name: 'CareerViet', fn: scrapeCareerViet },
+    { name: 'ChoTot', fn: scrapeChoTot }
   ];
   
   const browserScrapers = ENABLE_BROWSER ? [
@@ -1182,7 +1253,7 @@ async function scrapeAll(keyword) {
   ] : [];
   
   if (!ENABLE_BROWSER) {
-    console.log('[SCRAPE] Browser scrapers disabled (set ENABLE_BROWSER=true to enable)');
+    console.log('[SCRAPE] Browser scrapers disabled in code (BROWSER_ENABLED=false; needs >=2GB RAM instance)');
   }
 
   const allScrapers = [...httpScrapers, ...browserScrapers];
