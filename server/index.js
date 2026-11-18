@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
 const { scrapeAll, scrapeJobDetail, closeBrowser } = require('./scrapers');
+const { handleCvUpload } = require('./cv');
 const {
   createRateLimiter,
   isAllowedJobUrl,
@@ -55,6 +56,34 @@ app.use(cors({
   methods: ['GET'],
   allowedHeaders: ['Content-Type']
 }));
+
+// CV upload route: the JSON body carries a base64 file (up to ~7MB), so it
+// has its own parser and is registered before the global 256kb parser.
+// The file is processed in memory only and never stored.
+const cvLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 5,
+  message: 'Quá nhiều yêu cầu. Vui lòng thử lại sau.'
+});
+app.post('/api/cv-match', express.json({ limit: '8mb' }), cvLimiter, async (req, res) => {
+  const { filename, data } = req.body || {};
+  if (typeof data !== 'string' || !data) {
+    return res.status(400).json({ error: 'Thiếu nội dung file CV' });
+  }
+  console.log(`[CV] Upload: ${sanitizeText(String(filename || ''), 120)} from ${req.ip}`);
+  try {
+    const result = await withTimeout(
+      handleCvUpload({ filename, dataBase64: data }),
+      120000,
+      'CV match'
+    );
+    console.log(`[CV] Queries: ${result.queries.join(' | ')} -> ${result.jobs.length} matched jobs`);
+    res.json({ ...result, total: result.jobs.length });
+  } catch (err) {
+    console.error('[CV] Error:', err.message);
+    res.status(err.status || 500).json({ error: err.status ? err.message : 'Không xử lý được CV. Vui lòng thử lại.' });
+  }
+});
 
 app.use(express.json({ limit: '256kb' }));
 app.use(express.static(path.join(__dirname, '../public')));

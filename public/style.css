@@ -228,6 +228,70 @@ input, select { font-family: inherit; }
   .search-location { max-width: 116px; font-size: 13.5px; padding-left: 8px; }
 }
 
+/* CV upload */
+.cv-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 20px 22px;
+  box-shadow: var(--shadow-sm);
+  margin-top: 18px;
+}
+
+.cv-panel-inner { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; }
+.cv-text { flex: 1 1 300px; }
+.cv-title { font-size: 19px; font-weight: 700; margin: 0 0 6px; }
+.cv-sub { color: var(--muted); font-size: 14px; margin: 0; line-height: 1.55; }
+
+.cv-drop {
+  flex: 1 1 300px;
+  border: 2px dashed var(--line-strong);
+  border-radius: 14px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  color: var(--ink-2);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.cv-drop:hover, .cv-drop.dragover { border-color: var(--brand-1); background: rgba(14, 165, 233, 0.06); }
+.cv-drop-text { font-weight: 600; }
+.cv-drop-hint { font-size: 12.5px; color: var(--faint); }
+
+.cv-profile { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 14px; }
+.cv-profile-title { font-size: 13.5px; color: var(--muted); margin: 0 0 8px; }
+.cv-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.cv-chip {
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12.5px;
+}
+
+.cv-chip.skill { background: rgba(14, 165, 233, 0.1); border-color: rgba(14, 165, 233, 0.35); color: #0369a1; font-weight: 600; }
+
+.job-badges { display: flex; gap: 6px; align-items: flex-start; flex: none; }
+
+.match-badge {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #86efac;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 3px 9px;
+  white-space: nowrap;
+}
+
+.job-matched { color: #15803d; font-size: 13px; margin: 6px 0 0; }
+
 .search-input {
   flex: 1;
   min-width: 0;

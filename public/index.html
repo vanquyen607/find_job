@@ -108,6 +108,27 @@
         </div>
       </section>
 
+      <section class="cv-panel" aria-label="Tìm việc bằng CV">
+        <div class="cv-panel-inner">
+          <div class="cv-text">
+            <h2 class="cv-title">Tìm việc bằng CV</h2>
+            <p class="cv-sub">Tải CV lên, hệ thống tự đọc kỹ năng, kinh nghiệm và địa điểm trong CV rồi tìm việc khớp nhất cho bạn. File chỉ xử lý trong bộ nhớ, không lưu lại trên máy chủ.</p>
+          </div>
+          <div id="cv-drop" class="cv-drop" role="button" tabindex="0" aria-label="Tải CV lên">
+            <input type="file" id="cv-file" accept=".pdf,.docx" hidden>
+            <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <path d="M14 2v6h6"></path>
+              <path d="M12 18v-6"></path>
+              <path d="m9 15 3-3 3 3"></path>
+            </svg>
+            <span class="cv-drop-text">Kéo thả file CV vào đây hoặc <u>chọn file</u></span>
+            <span class="cv-drop-hint">PDF hoặc Word (.docx), tối đa 5MB</span>
+          </div>
+        </div>
+        <div id="cv-profile" class="cv-profile hidden"></div>
+      </section>
+
       <section class="stat-row" aria-label="Tổng quan">
         <div class="stat-card">
           <span class="stat-card-label">Việc làm tìm thấy</span>
