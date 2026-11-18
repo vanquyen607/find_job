@@ -210,6 +210,24 @@ input, select { font-family: inherit; }
 
 .search-icon { color: var(--faint); flex: none; }
 
+.search-location {
+  flex: none;
+  max-width: 168px;
+  border: none;
+  border-left: 1.5px solid var(--line);
+  background: transparent;
+  padding: 8px 2px 8px 12px;
+  font: inherit;
+  font-size: 14.5px;
+  color: var(--ink-2);
+  cursor: pointer;
+  outline: none;
+}
+
+@media (max-width: 640px) {
+  .search-location { max-width: 116px; font-size: 13.5px; padding-left: 8px; }
+}
+
 .search-input {
   flex: 1;
   min-width: 0;
@@ -600,6 +618,20 @@ input, select { font-family: inherit; }
 
 .job-meta-item.salary { color: var(--salary); font-weight: 700; }
 .job-meta-item.salary svg { color: var(--salary); }
+
+.job-meta-item.deadline { color: #b45309; font-weight: 600; }
+.job-meta-item.deadline svg { color: #b45309; }
+.job-meta-item.deadline.soon { color: #dc2626; }
+.job-meta-item.deadline.soon svg { color: #dc2626; }
+.job-meta-item.deadline.expired { color: #dc2626; font-weight: 700; }
+.job-meta-item.deadline.expired svg { color: #dc2626; }
+
+.job-meta-item.posted { color: var(--faint); }
+
+.job-card--expired { opacity: 0.62; }
+
+.detail-value.deadline-value.soon,
+.detail-value.deadline-value.expired { color: #dc2626; font-weight: 700; }
 
 .job-description {
   margin: 11px 0 0;

@@ -3,7 +3,9 @@ const PLATFORM_HOSTS = {
   careerviet: ['careerviet.vn'],
   itviec: ['itviec.com'],
   glints: ['glints.com'],
-  topcv: ['topcv.vn']
+  topcv: ['topcv.vn'],
+  chotot: ['chotot.com'],
+  topdev: ['topdev.vn']
 };
 
 const ALLOWED_HOSTS = Object.values(PLATFORM_HOSTS).flat();

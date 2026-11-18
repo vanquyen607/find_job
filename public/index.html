@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Tìm kiếm việc làm thông minh từ VietnamWorks, CareerViet và Chợ Tốt. Lọc, so sánh và lưu việc làm yêu thích ở một nơi.">
+  <meta name="description" content="Tìm kiếm việc làm thông minh từ VietnamWorks, CareerViet, Chợ Tốt và TopDev. Lọc, so sánh và lưu việc làm yêu thích ở một nơi.">
   <meta name="theme-color" content="#f8fafc">
   <title>FindJob - Tìm Kiếm Việc Làm Thông Minh</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -23,7 +23,7 @@
           <span>Find<span class="text-gradient">Job</span></span>
         </a>
         <div class="header-right">
-          <span class="header-pill">3 nền tảng · Miễn phí</span>
+          <span class="header-pill">4 nền tảng · Miễn phí</span>
           <button type="button" class="btn-saved-header" data-action="show-saved-jobs">
             <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
@@ -38,7 +38,7 @@
     <main class="dash">
       <section class="dash-head">
         <h1 class="dash-title">Tìm việc làm <span class="text-gradient">nhanh hơn</span></h1>
-        <p class="dash-subtitle">Một ô tìm kiếm — quét đồng thời VietnamWorks, CareerViet và Chợ Tốt. Không cần tài khoản, mở web là tìm ngay.</p>
+        <p class="dash-subtitle">Một ô tìm kiếm — quét đồng thời VietnamWorks, CareerViet, Chợ Tốt và TopDev. Không cần tài khoản, mở web là tìm ngay.</p>
         <div class="search-box">
           <div class="search-input-wrapper">
             <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -54,6 +54,38 @@
               aria-label="Từ khóa tìm kiếm việc làm"
               maxlength="100"
             >
+            <select id="search-location" class="search-location" aria-label="Địa điểm tìm kiếm">
+              <option value="">Tất cả địa điểm</option>
+              <option value="ha-noi">Hà Nội</option>
+              <option value="ho-chi-minh">Hồ Chí Minh</option>
+              <option value="da-nang">Đà Nẵng</option>
+              <option value="hai-phong">Hải Phòng</option>
+              <option value="can-tho">Cần Thơ</option>
+              <option value="binh-duong">Bình Dương</option>
+              <option value="dong-nai">Đồng Nai</option>
+              <option value="bac-ninh">Bắc Ninh</option>
+              <option value="bac-giang">Bắc Giang</option>
+              <option value="hung-yen">Hưng Yên</option>
+              <option value="hai-duong">Hải Dương</option>
+              <option value="vinh-phuc">Vĩnh Phúc</option>
+              <option value="quang-ninh">Quảng Ninh</option>
+              <option value="thanh-hoa">Thanh Hóa</option>
+              <option value="nghe-an">Nghệ An</option>
+              <option value="ha-tinh">Hà Tĩnh</option>
+              <option value="thua-thien-hue">Thừa Thiên Huế</option>
+              <option value="quang-nam">Quảng Nam</option>
+              <option value="binh-dinh">Bình Định</option>
+              <option value="khanh-hoa">Khánh Hòa</option>
+              <option value="lam-dong">Lâm Đồng</option>
+              <option value="ba-ria-vung-tau">Bà Rịa - Vũng Tàu</option>
+              <option value="long-an">Long An</option>
+              <option value="tien-giang">Tiền Giang</option>
+              <option value="an-giang">An Giang</option>
+              <option value="kien-giang">Kiên Giang</option>
+              <option value="tay-ninh">Tây Ninh</option>
+              <option value="dak-lak">Đắk Lắk</option>
+              <option value="remote">Làm việc từ xa</option>
+            </select>
             <button type="button" id="search-btn" class="search-btn">
               <span class="btn-text">Tìm kiếm</span>
               <span class="btn-spinner hidden">
@@ -84,8 +116,8 @@
         </div>
         <div class="stat-card">
           <span class="stat-card-label">Nguồn dữ liệu</span>
-          <span class="stat-card-value">3</span>
-          <span class="stat-card-hint">VietnamWorks · CareerViet · Chợ Tốt</span>
+          <span class="stat-card-value">4</span>
+          <span class="stat-card-hint">VietnamWorks · CareerViet · Chợ Tốt · TopDev</span>
         </div>
         <div class="stat-card">
           <span class="stat-card-label">Việc đã lưu</span>
@@ -115,6 +147,10 @@
             <label class="filter-checkbox">
               <input type="checkbox" value="chotot" checked>
               <span class="dot" style="--dot:#ea580c"></span> Chợ Tốt
+            </label>
+            <label class="filter-checkbox">
+              <input type="checkbox" value="topdev" checked>
+              <span class="dot" style="--dot:#7c3aed"></span> TopDev
             </label>
           </div>
           <div class="filter-group">
@@ -237,7 +273,7 @@
     </main>
 
     <footer class="app-footer">
-      <p>FindJob — Tổng hợp việc làm từ VietnamWorks, CareerViet và Chợ Tốt</p>
+      <p>FindJob — Tổng hợp việc làm từ VietnamWorks, CareerViet, Chợ Tốt và TopDev</p>
     </footer>
   </div>
 

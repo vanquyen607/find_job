@@ -208,6 +208,30 @@ async function getStealthBrowser() {
 // ==================== GET JOB DETAIL ====================
 async function getJobDetail(job) {
   if (!job.url || job.platform === 'vietnamworks') return job;
+
+  // TopDev detail comes from its own API (light HTTP, no browser needed):
+  // responsibilities/requirements are only served by the detail endpoint.
+  if (job.platform === 'topdev') {
+    try {
+      const id = (job.url.match(/-(\d+)$/) || [])[1];
+      if (id) {
+        const { data } = await axios.get(`https://api.topdev.vn/td/v2/jobs/${id}`, {
+          params: { 'fields[job]': 'content,responsibilities_original,requirements_original' },
+          headers: { 'User-Agent': getRandomUA() },
+          timeout: 10000
+        });
+        const d = data?.data || {};
+        const desc = decodeEntities(stripHtml(d.content || d.responsibilities_original || '')).slice(0, 1500);
+        const req = decodeEntities(stripHtml(d.requirements_original || '')).slice(0, 1500);
+        if (desc) job.description = desc;
+        if (req) job.requirements = req;
+      }
+    } catch (e) {
+      console.error('[TopDev] Detail error:', e.message);
+    }
+    return job;
+  }
+
   // No browser on small instances (see BROWSER_ENABLED note at the top):
   // jobs keep the description captured during search.
   if (!BROWSER_ENABLED) return job;
@@ -357,9 +381,10 @@ async function getJobDetail(job) {
 
 // Batch get details for multiple jobs (input order = relevance order)
 async function batchGetDetails(jobs, maxDetails = 5) {
-  // CareerViet and ITviec support direct detail pages. Glints blocks detail
-  // requests and TopCV already returns usable card data, so skip both.
-  const detailPlatforms = new Set(['careerviet', 'itviec']);
+  // CareerViet and ITviec support direct detail pages; TopDev details come
+  // from its API. Glints blocks detail requests and TopCV already returns
+  // usable card data, so skip both.
+  const detailPlatforms = new Set(['careerviet', 'itviec', 'topdev']);
   const eligible = jobs
     .filter(j => detailPlatforms.has(j.platform) && String(j.description || '').length < 100);
 
@@ -404,30 +429,36 @@ async function batchGetDetails(jobs, maxDetails = 5) {
 }
 
 // ==================== VIETNAMWORKS (API) ✅ ====================
-async function scrapeVietnamWorks(keyword) {
+async function scrapeVietnamWorks(keyword, opts = {}) {
   console.log('[VietnamWorks] Using API...');
   const jobs = [];
 
   try {
     const apiUrl = 'https://ms.vietnamworks.com/job-search/v1.0/search';
-    const payload = {
-      query: keyword,
-      filter: [],
-      ranges: [],
-      order: [],
-      hitsPerPage: 30,
-      page: 0
-    };
+    // Location searches fetch a second page so the location filter has a
+    // wider pool to work with.
+    const pages = opts.location ? [0, 1] : [0];
+    let items = [];
+    for (const page of pages) {
+      const payload = {
+        query: keyword,
+        filter: [],
+        ranges: [],
+        order: [],
+        hitsPerPage: 30,
+        page
+      };
 
-    const { data } = await axios.post(apiUrl, payload, {
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': getRandomUA()
-      },
-      timeout: 15000
-    });
+      const { data } = await axios.post(apiUrl, payload, {
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': getRandomUA()
+        },
+        timeout: 15000
+      });
 
-    const items = data?.data || [];
+      items = items.concat(data?.data || []);
+    }
     items.forEach(job => {
       let salary = job.prettySalary || 'Thương lượng';
       if (job.isSalaryVisible && job.salaryMin > 0) {
@@ -460,6 +491,8 @@ async function scrapeVietnamWorks(keyword) {
         description: desc,
         requirements: req,
         skills,
+        deadline: job.expiredOn ? String(job.expiredOn).slice(0, 10) : '',
+        postedAt: job.onlineOn ? String(job.onlineOn).slice(0, 10) : '',
         url: job.jobUrl || `https://www.vietnamworks.com/-i${job.jobId}.jv`,
         platform: 'vietnamworks'
       });
@@ -915,6 +948,14 @@ async function scrapeCareerViet(keyword) {
           const locationEl = $(el).find('.location li').first();
           const location = locationEl.text().trim();
 
+          // CareerViet cards print "Hạn nộp: dd-mm-yyyy" and
+          // "Cập nhật: dd-mm-yyyy" as plain text inside the card.
+          const cardText = $(el).text().replace(/\s+/g, ' ');
+          const dlMatch = cardText.match(/Hạn nộp:\s*(\d{2})-(\d{2})-(\d{4})/);
+          const upMatch = cardText.match(/Cập nhật:\s*(\d{2})-(\d{2})-(\d{4})/);
+          const deadline = dlMatch ? `${dlMatch[3]}-${dlMatch[2]}-${dlMatch[1]}` : '';
+          const postedAt = upMatch ? `${upMatch[3]}-${upMatch[2]}-${upMatch[1]}` : '';
+
           if (title && title.length > 3) {
             jobs.push({
               title,
@@ -923,6 +964,8 @@ async function scrapeCareerViet(keyword) {
               salary: salary || '',
               experience: '',
               description: '',
+              deadline,
+              postedAt,
               url: link ? (link.startsWith('http') ? link : `https://careerviet.vn${link}`) : '',
               platform: 'careerviet'
             });
@@ -968,13 +1011,13 @@ function formatChoTotSalary(ad) {
   return parts.length ? `${parts.join(' - ')}/tháng` : '';
 }
 
-async function scrapeChoTot(keyword) {
+async function scrapeChoTot(keyword, opts = {}) {
   console.log('[ChoTot] Starting...');
   const jobs = [];
 
   try {
     const { data } = await axios.get('https://gateway.chotot.com/v1/public/ad-listing', {
-      params: { cg: 13000, q: keyword, limit: 30 },
+      params: { cg: 13000, q: keyword, limit: opts.location ? 50 : 30 },
       headers: { 'User-Agent': getRandomUA() },
       timeout: 15000
     });
@@ -989,6 +1032,9 @@ async function scrapeChoTot(keyword) {
         salary: formatChoTotSalary(ad),
         experience: '',
         description: stripHtml(ad.body || '').slice(0, 1500),
+        deadline: '',
+        // list_time is epoch ms (UTC) - shift to VN time before taking the date.
+        postedAt: ad.list_time ? new Date(ad.list_time + 7 * 3600 * 1000).toISOString().slice(0, 10) : '',
         url: `https://www.chotot.com/viec-lam/${ad.ad_id}.htm`,
         platform: 'chotot'
       });
@@ -997,6 +1043,91 @@ async function scrapeChoTot(keyword) {
     console.log(`[ChoTot] Found ${jobs.length} jobs`);
   } catch (e) {
     console.error('[ChoTot] Error:', e.message);
+  }
+
+  return jobs;
+}
+
+// ==================== TOPDEV (API) ✅ ====================
+// TopDev detail HTML arrives entity-encoded (&aacute; etc.) even after tag
+// stripping, so decode entities before the text reaches the UI.
+function decodeEntities(text) {
+  const named = {
+    amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
+    aacute: 'á', agrave: 'à', acirc: 'â', atilde: 'ã', eacute: 'é', egrave: 'è',
+    ecirc: 'ê', iacute: 'í', igrave: 'ì', oacute: 'ó', ograve: 'ò', ocirc: 'ô',
+    otilde: 'õ', uacute: 'ú', ugrave: 'ù', yacute: 'ý',
+    Aacute: 'Á', Agrave: 'À', Acirc: 'Â', Atilde: 'Ã', Eacute: 'É', Egrave: 'È',
+    Ecirc: 'Ê', Iacute: 'Í', Igrave: 'Ì', Oacute: 'Ó', Ograve: 'Ò', Ocirc: 'Ô',
+    Otilde: 'Õ', Uacute: 'Ú', Ugrave: 'Ù', Yacute: 'Ý'
+  };
+  return String(text || '')
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&([a-zA-Z]+);/g, (m, name) => (name in named ? named[name] : m));
+}
+
+
+function formatTopDevSalary(salary) {
+  if (!salary) return '';
+  const min = Number(salary.min_filter) || 0;
+  const max = Number(salary.max_filter) || 0;
+  const fmt = (v) => `${(Math.round(v / 1e5) / 10).toString().replace('.', ',')} triệu`;
+  if (min && max) return min === max ? `${fmt(min)}/tháng` : `${fmt(min)} - ${fmt(max)}/tháng`;
+  if (min) return `Từ ${fmt(min)}/tháng`;
+  if (max) return `Đến ${fmt(max)}/tháng`;
+  if (salary.is_negotiable) return 'Thương lượng';
+  return '';
+}
+
+async function scrapeTopDev(keyword, opts = {}) {
+  console.log('[TopDev] Starting...');
+  const jobs = [];
+
+  try {
+    // TopDev's public API returns full job documents only when the caller
+    // names the fields it wants (fields[job]=...); a bare call returns
+    // flag-only stubs. The keyword parameter is `keyword`
+    // (API behaviour verified live 2026-11-18). Page size is fixed at 10
+    // by the API, so location searches also fetch page 2.
+    const pageCount = opts.location ? 2 : 1;
+    let items = [];
+    for (let page = 1; page <= pageCount; page++) {
+      const { data } = await axios.get('https://api.topdev.vn/td/v2/jobs', {
+        params: {
+          keyword,
+          page,
+          'fields[job]': 'id,title,company,addresses,salary,detail_url,published'
+        },
+        headers: { 'User-Agent': getRandomUA() },
+        timeout: 15000
+      });
+      items = items.concat(data?.data || []);
+    }
+
+    for (const item of items) {
+      if (!item.title || !item.detail_url) continue;
+      const regions = item.addresses?.address_region_array || [];
+      // TopDev exposes no application deadline; published.date is dd-mm-yyyy.
+      const pubParts = String(item.published?.date || '').split('-');
+      const postedAt = pubParts.length === 3 ? `${pubParts[2]}-${pubParts[1]}-${pubParts[0]}` : '';
+      jobs.push({
+        title: softenCaps(item.title),
+        company: item.company?.display_name || '',
+        location: regions.map((r) => String(r).replace(/^Thành phố /, '')).join(', '),
+        salary: formatTopDevSalary(item.salary),
+        experience: '',
+        description: '',
+        deadline: '',
+        postedAt,
+        url: item.detail_url,
+        platform: 'topdev'
+      });
+    }
+
+    console.log(`[TopDev] Found ${jobs.length} jobs`);
+  } catch (e) {
+    console.error('[TopDev] Error:', e.message);
   }
 
   return jobs;
@@ -1224,11 +1355,57 @@ function withTimeout(promise, ms, name) {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
-async function scrapeAll(keyword) {
-  console.log(`\n[SCRAPE] ========== Searching: "${keyword}" ==========\n`);
-  
+// ==================== LOCATIONS ====================
+// Search-time location filter: the client sends a slug, the server keeps
+// only jobs whose location text matches one of the aliases. Aliases are
+// stored pre-normalized (lowercase, no diacritics).
+const LOCATIONS = {
+  'ha-noi': { name: 'Hà Nội', aliases: ['ha noi', 'hanoi'] },
+  'ho-chi-minh': { name: 'Hồ Chí Minh', aliases: ['ho chi minh', 'tp.hcm', 'tphcm', 'hcm', 'sai gon'] },
+  'da-nang': { name: 'Đà Nẵng', aliases: ['da nang'] },
+  'hai-phong': { name: 'Hải Phòng', aliases: ['hai phong'] },
+  'can-tho': { name: 'Cần Thơ', aliases: ['can tho'] },
+  'binh-duong': { name: 'Bình Dương', aliases: ['binh duong'] },
+  'dong-nai': { name: 'Đồng Nai', aliases: ['dong nai', 'bien hoa'] },
+  'bac-ninh': { name: 'Bắc Ninh', aliases: ['bac ninh'] },
+  'bac-giang': { name: 'Bắc Giang', aliases: ['bac giang'] },
+  'hung-yen': { name: 'Hưng Yên', aliases: ['hung yen'] },
+  'hai-duong': { name: 'Hải Dương', aliases: ['hai duong'] },
+  'vinh-phuc': { name: 'Vĩnh Phúc', aliases: ['vinh phuc'] },
+  'quang-ninh': { name: 'Quảng Ninh', aliases: ['quang ninh', 'ha long'] },
+  'thanh-hoa': { name: 'Thanh Hóa', aliases: ['thanh hoa'] },
+  'nghe-an': { name: 'Nghệ An', aliases: ['nghe an'] },
+  'ha-tinh': { name: 'Hà Tĩnh', aliases: ['ha tinh'] },
+  'thua-thien-hue': { name: 'Thừa Thiên Huế', aliases: ['thua thien hue', 'hue'] },
+  'quang-nam': { name: 'Quảng Nam', aliases: ['quang nam', 'hoi an', 'tam ky'] },
+  'binh-dinh': { name: 'Bình Định', aliases: ['binh dinh', 'quy nhon'] },
+  'khanh-hoa': { name: 'Khánh Hòa', aliases: ['khanh hoa', 'nha trang'] },
+  'lam-dong': { name: 'Lâm Đồng', aliases: ['lam dong', 'da lat'] },
+  'ba-ria-vung-tau': { name: 'Bà Rịa - Vũng Tàu', aliases: ['ba ria', 'vung tau'] },
+  'long-an': { name: 'Long An', aliases: ['long an'] },
+  'tien-giang': { name: 'Tiền Giang', aliases: ['tien giang', 'my tho'] },
+  'an-giang': { name: 'An Giang', aliases: ['an giang', 'long xuyen'] },
+  'kien-giang': { name: 'Kiên Giang', aliases: ['kien giang', 'rach gia', 'phu quoc'] },
+  'tay-ninh': { name: 'Tây Ninh', aliases: ['tay ninh'] },
+  'dak-lak': { name: 'Đắk Lắk', aliases: ['dak lak', 'buon ma thuot'] },
+  'remote': { name: 'Làm việc từ xa', aliases: ['remote', 'tu xa', 'work from home', 'lam viec tu xa'] }
+};
+
+// (Reuses the shared normalizeText helper defined above: lowercase,
+// diacritics stripped, đ -> d.)
+function matchesLocation(jobLocation, loc) {
+  if (!loc) return true;
+  const text = normalizeText(jobLocation);
+  if (!text) return false;
+  return loc.aliases.some((alias) => text.includes(alias));
+}
+
+async function scrapeAll(keyword, locationSlug) {
+  const loc = locationSlug ? LOCATIONS[locationSlug] || null : null;
+  console.log(`\n[SCRAPE] ========== Searching: "${keyword}"${loc ? ` @ ${loc.name}` : ''} ==========\n`);
+
   // Check cache first
-  const cacheKey = getCacheKey(keyword);
+  const cacheKey = getCacheKey(keyword) + (loc ? `-loc:${locationSlug}` : '');
   const cached = getFromCache(cacheKey);
   if (cached) {
     console.log(`[SCRAPE] Cache hit for "${keyword}"`);
@@ -1238,12 +1415,15 @@ async function scrapeAll(keyword) {
 
   const SCRAPE_TIMEOUT = parseInt(process.env.SCRAPE_TIMEOUT) || 40000;
   const MAX_JOBS_PER_PLATFORM = parseInt(process.env.MAX_JOBS_PER_PLATFORM) || 20;
+  // With a location filter the pool must be wider, or the filter starves.
+  const poolCap = loc ? 40 : MAX_JOBS_PER_PLATFORM;
   const ENABLE_BROWSER = BROWSER_ENABLED;
 
   const httpScrapers = [
     { name: 'VietnamWorks', fn: scrapeVietnamWorks },
     { name: 'CareerViet', fn: scrapeCareerViet },
-    { name: 'ChoTot', fn: scrapeChoTot }
+    { name: 'ChoTot', fn: scrapeChoTot },
+    { name: 'TopDev', fn: scrapeTopDev }
   ];
   
   const browserScrapers = ENABLE_BROWSER ? [
@@ -1266,12 +1446,12 @@ async function scrapeAll(keyword) {
       const startTime = Date.now();
       try {
         const jobs = await withTimeout(
-          scraper.fn(keyword),
+          scraper.fn(keyword, { location: loc }),
           SCRAPE_TIMEOUT,
           scraper.name
         );
         recordMetric(scraper.name, Date.now() - startTime, true);
-        const limited = jobs.slice(0, MAX_JOBS_PER_PLATFORM);
+        const limited = jobs.slice(0, poolCap);
         console.log(`[${scraper.name}] OK: ${limited.length} jobs in ${Date.now() - startTime}ms`);
         return { name: scraper.name, jobs: limited };
       } catch (err) {
@@ -1299,11 +1479,11 @@ async function scrapeAll(keyword) {
     const startTime = Date.now();
     try {
       const jobs = await withTimeout(
-        scraper.fn(keyword),
+        scraper.fn(keyword, { location: loc }),
         SCRAPE_TIMEOUT,
         scraper.name
       );
-      const limited = jobs.slice(0, MAX_JOBS_PER_PLATFORM);
+      const limited = jobs.slice(0, poolCap);
       recordMetric(scraper.name, Date.now() - startTime, true);
       console.log(`[${scraper.name}] OK: ${limited.length} jobs in ${Date.now() - startTime}ms`);
       results.push({ status: 'fulfilled', value: { name: scraper.name, jobs: limited } });
@@ -1328,7 +1508,13 @@ async function scrapeAll(keyword) {
     }
   });
 
-  const cleaned = cleanAndDeduplicate(allJobs);
+  let cleaned = cleanAndDeduplicate(allJobs);
+
+  if (loc) {
+    const before = cleaned.length;
+    cleaned = cleaned.filter((job) => matchesLocation(job.location, loc));
+    console.log(`[SCRAPE] Location filter (${loc.name}): ${before} -> ${cleaned.length} jobs`);
+  }
 
   // Rank before fetching details so the most relevant jobs get enriched first.
   const ranked = rankJobs(cleaned, keyword);
