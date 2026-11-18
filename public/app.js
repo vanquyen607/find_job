@@ -6,11 +6,12 @@ const PLATFORM_META = {
   vietnamworks: { name: 'VietnamWorks', color: '#1d4ed8' },
   careerviet: { name: 'CareerViet', color: '#15803d' },
   chotot: { name: 'Chợ Tốt', color: '#ea580c' },
+  topdev: { name: 'TopDev', color: '#7c3aed' },
   itviec: { name: 'ITviec', color: '#b45309' },
   glints: { name: 'Glints', color: '#0e7490' },
   topcv: { name: 'TopCV', color: '#b91c1c' }
 };
-const PLATFORM_ORDER = ['vietnamworks', 'careerviet', 'chotot', 'itviec', 'glints', 'topcv'];
+const PLATFORM_ORDER = ['vietnamworks', 'careerviet', 'chotot', 'topdev', 'itviec', 'glints', 'topcv'];
 const MAX_COMPARE = 4;
 const VISIBLE_PER_PLATFORM = 6;
 const RECENT_SEARCH_LIMIT = 6;
@@ -26,6 +27,8 @@ const state = {
   recentSearches: loadRecentSearches(),
   searchController: null,
   lastQuery: '',
+  lastLocation: '',
+  lastLocationName: '',
   loadTimeMs: null
 };
 
@@ -230,6 +233,9 @@ async function performSearch(rawQuery) {
   const controller = new AbortController();
   state.searchController = controller;
   state.lastQuery = query;
+  const locSelect = document.getElementById('search-location');
+  state.lastLocation = locSelect?.value || '';
+  state.lastLocationName = locSelect?.selectedOptions?.[0]?.textContent?.trim() || '';
   if (els.searchInput) els.searchInput.value = query;
 
   addRecentSearch(query);
@@ -241,7 +247,8 @@ async function performSearch(rawQuery) {
   const startTime = Date.now();
 
   try {
-    const response = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}`, {
+    const locParam = state.lastLocation ? `&location=${encodeURIComponent(state.lastLocation)}` : '';
+    const response = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}${locParam}`, {
       signal: controller.signal
     });
     const data = await response.json().catch(() => ({}));
@@ -467,7 +474,7 @@ function renderResults() {
   }
 
   if (els.resultsHeader) els.resultsHeader.classList.remove('hidden');
-  if (els.searchQuery) els.searchQuery.textContent = state.lastQuery;
+  if (els.searchQuery) els.searchQuery.textContent = state.lastLocation ? `${state.lastQuery} · ${state.lastLocationName}` : state.lastQuery;
   if (els.resultCount) els.resultCount.textContent = String(jobs.length);
   if (els.loadTime && state.loadTimeMs) {
     els.loadTime.textContent = `· ${(state.loadTimeMs / 1000).toFixed(1)}s`;
@@ -529,6 +536,46 @@ function renderPlatformSection(platform, jobs) {
   `;
 }
 
+function fmtDateVN(iso) {
+  const p = String(iso || '').split('-');
+  return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : '';
+}
+
+function daysUntil(iso) {
+  const d = new Date(`${iso}T23:59:59`);
+  if (Number.isNaN(d.getTime())) return null;
+  return Math.ceil((d - Date.now()) / 86400000);
+}
+
+function daysSince(iso) {
+  const d = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  return Math.floor((Date.now() - d) / 86400000);
+}
+
+// Returns { text, cls } for the application deadline, or null when the
+// source does not publish one.
+function deadlineInfo(job) {
+  if (!job.deadline) return null;
+  const days = daysUntil(job.deadline);
+  const date = fmtDateVN(job.deadline);
+  if (days === null) return null;
+  if (days < 0) return { text: `Đã hết hạn ${date}`, cls: 'expired', expired: true };
+  if (days === 0) return { text: `Hết hạn hôm nay (${date})`, cls: 'soon', expired: false };
+  if (days <= 7) return { text: `Hạn nộp: ${date} · còn ${days} ngày`, cls: 'soon', expired: false };
+  return { text: `Hạn nộp: ${date} · còn ${days} ngày`, cls: '', expired: false };
+}
+
+function postedText(job) {
+  if (!job.postedAt) return '';
+  const days = daysSince(job.postedAt);
+  if (days === null) return '';
+  if (days <= 0) return 'Đăng hôm nay';
+  if (days === 1) return 'Đăng hôm qua';
+  if (days < 30) return `Đăng ${days} ngày trước`;
+  return `Đăng: ${fmtDateVN(job.postedAt)}`;
+}
+
 function createJobCard(job) {
   const url = safeHttpUrl(job.url);
   const isSaved = state.savedJobIds.has(job.url);
@@ -572,10 +619,38 @@ function createJobCard(job) {
     `);
   }
 
+  const dl = deadlineInfo(job);
+  if (dl) {
+    meta.push(`
+      <span class="job-meta-item deadline ${dl.cls}">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="18" rx="2"></rect>
+          <line x1="16" y1="2" x2="16" y2="6"></line>
+          <line x1="8" y1="2" x2="8" y2="6"></line>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+        </svg>
+        ${escapeHtml(dl.text)}
+      </span>
+    `);
+  }
+
+  const posted = postedText(job);
+  if (posted) {
+    meta.push(`
+      <span class="job-meta-item posted">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+        ${escapeHtml(posted)}
+      </span>
+    `);
+  }
+
   const color = platformColor(job.platform);
 
   return `
-    <article class="job-card" data-url="${escapeHtml(job.url)}" tabindex="0" aria-label="${escapeHtml(job.title)} tại ${escapeHtml(job.company)}">
+    <article class="job-card${dl && dl.expired ? ' job-card--expired' : ''}" data-url="${escapeHtml(job.url)}" tabindex="0" aria-label="${escapeHtml(job.title)} tại ${escapeHtml(job.company)}">
       <label class="job-compare-label" title="Chọn để so sánh">
         <input type="checkbox" class="job-card-checkbox" data-url="${escapeHtml(job.url)}" ${isCompared ? 'checked' : ''} aria-label="Chọn ${escapeHtml(job.title)} để so sánh">
       </label>
@@ -740,6 +815,18 @@ function renderDetailBody(data, isLoading, url) {
         <div class="detail-row">
           <span class="detail-label">Kinh nghiệm:</span>
           <span class="detail-value">${escapeHtml(data.experience)}</span>
+        </div>
+      ` : ''}
+      ${deadlineInfo(data) ? `
+        <div class="detail-row">
+          <span class="detail-label">Hạn ứng tuyển:</span>
+          <span class="detail-value deadline-value ${deadlineInfo(data).cls}">${escapeHtml(deadlineInfo(data).text)}</span>
+        </div>
+      ` : ''}
+      ${postedText(data) ? `
+        <div class="detail-row">
+          <span class="detail-label">Ngày đăng:</span>
+          <span class="detail-value">${escapeHtml(postedText(data))}${data.postedAt ? ` (${fmtDateVN(data.postedAt)})` : ''}</span>
         </div>
       ` : ''}
     </div>
@@ -1006,6 +1093,8 @@ function showCompareModal() {
     { label: 'Địa điểm', key: 'location' },
     { label: 'Mức lương', key: 'salary' },
     { label: 'Kinh nghiệm', key: 'experience' },
+    { label: 'Hạn ứng tuyển', key: 'deadline', format: (v) => (v ? fmtDateVN(v) : '—') },
+    { label: 'Ngày đăng', key: 'postedAt', format: (v) => (v ? fmtDateVN(v) : '—') },
     { label: 'Mô tả', key: 'description' }
   ];
 
@@ -1034,9 +1123,10 @@ function exportToCSV() {
     return;
   }
 
-  const headers = ['Tên công việc', 'Công ty', 'Địa điểm', 'Mức lương', 'Kinh nghiệm', 'Mô tả', 'Nền tảng', 'Link'];
+  const headers = ['Tên công việc', 'Công ty', 'Địa điểm', 'Mức lương', 'Kinh nghiệm', 'Hạn ứng tuyển', 'Ngày đăng', 'Mô tả', 'Nền tảng', 'Link'];
   const rows = jobs.map((job) => [
     job.title, job.company, job.location, job.salary, job.experience,
+    job.deadline ? fmtDateVN(job.deadline) : '', job.postedAt ? fmtDateVN(job.postedAt) : '',
     job.description, platformName(job.platform), job.url
   ].map(csvCell).join(','));
 
@@ -1128,6 +1218,9 @@ function bindGlobalEvents() {
       event.preventDefault();
       performSearch();
     }
+  });
+  document.getElementById('search-location')?.addEventListener('change', () => {
+    if (state.lastQuery) performSearch(state.lastQuery);
   });
 
   document.querySelectorAll('.filter-checkbox input').forEach((checkbox) => {

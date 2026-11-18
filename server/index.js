@@ -86,20 +86,21 @@ app.get('/api/health', (req, res) => {
 
 app.get('/api/search', searchLimiter, async (req, res) => {
   const q = typeof req.query.q === 'string' ? sanitizeText(req.query.q, 100) : '';
+  const location = typeof req.query.location === 'string' ? sanitizeText(req.query.location, 40) : '';
 
   if (!q || q.length < 2) {
     return res.status(400).json({ error: 'Vui lòng nhập từ khóa tìm kiếm (ít nhất 2 ký tự)' });
   }
 
-  console.log(`[SEARCH] Query: "${q}" from ${req.ip}`);
+  console.log(`[SEARCH] Query: "${q}"${location ? ` @ ${location}` : ''} from ${req.ip}`);
 
   try {
     const startTime = Date.now();
-    const jobs = await withTimeout(scrapeAll(q), 90000, 'Search API');
+    const jobs = await withTimeout(scrapeAll(q, location), 90000, 'Search API');
     const duration = Date.now() - startTime;
 
     console.log(`[SEARCH] Found ${jobs.length} jobs in ${duration}ms`);
-    res.json({ jobs, total: jobs.length, duration, cached: false });
+    res.json({ jobs, total: jobs.length, duration, cached: false, location: location || null });
   } catch (error) {
     console.error('[ERROR]', error.message);
     res.status(500).json({ error: 'Có lỗi xảy ra khi tìm kiếm. Vui lòng thử lại.' });
