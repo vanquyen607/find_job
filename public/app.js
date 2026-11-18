@@ -283,6 +283,72 @@ async function performSearch(rawQuery) {
   }
 }
 
+function renderCvProfile(profile, queries) {
+  const el = document.getElementById('cv-profile');
+  if (!el || !profile) return;
+  const chips = [];
+  if (profile.experienceYears) chips.push(`<span class="cv-chip">Kinh nghiệm: ${profile.experienceYears} năm</span>`);
+  if (profile.location) chips.push(`<span class="cv-chip">Địa điểm: ${escapeHtml(profile.location.name)}</span>`);
+  if (profile.email) chips.push(`<span class="cv-chip">${escapeHtml(profile.email)}</span>`);
+  (profile.skills || []).forEach((s) => chips.push(`<span class="cv-chip skill">${escapeHtml(s)}</span>`));
+  el.innerHTML = `
+    <p class="cv-profile-title">Hồ sơ trích xuất từ CV — từ khóa đã dùng để tìm: <strong>${queries.map((q) => escapeHtml(q)).join(' · ')}</strong></p>
+    <div class="cv-chips">${chips.join('')}</div>
+  `;
+  el.classList.remove('hidden');
+}
+
+async function handleCvFile(file) {
+  if (!file) return;
+  if (!/\.(pdf|docx)$/i.test(file.name)) {
+    showToast('Chỉ hỗ trợ file PDF hoặc Word (.docx)', 'error');
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    showToast('File CV vượt quá 5MB', 'error');
+    return;
+  }
+
+  setLoading(true);
+  showSkeletons();
+  showProgress();
+  try {
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    const response = await fetch(`${API_BASE}/api/cv-match`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: file.name, data: String(dataUrl).split(',')[1] || '' })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Không xử lý được CV');
+
+    state.jobs = Array.isArray(data.jobs) ? data.jobs : [];
+    state.lastQuery = 'CV của bạn';
+    state.lastLocation = '';
+    state.lastLocationName = '';
+    state.loadTimeMs = null;
+    state.expandedPlatforms.clear();
+    state.collapsedPlatforms.clear();
+
+    renderCvProfile(data.profile, data.queries || []);
+    hideProgress();
+    applyFilters();
+    refreshSaveButtons();
+    scrollToResults();
+    showToast(`Tìm thấy ${state.jobs.length} việc khớp với CV của bạn`, 'success');
+  } catch (err) {
+    hideProgress();
+    showError(err.message || 'Không xử lý được CV');
+  } finally {
+    setLoading(false);
+  }
+}
+
 function setLoading(isLoading) {
   if (els.searchBtn) els.searchBtn.disabled = isLoading;
   els.btnText?.classList.toggle('hidden', isLoading);
@@ -659,11 +725,15 @@ function createJobCard(job) {
           <h3 class="job-title">${escapeHtml(job.title)}</h3>
           <p class="job-company">${escapeHtml(job.company)}</p>
         </div>
-        <span class="job-platform-badge" style="background: ${color}1a; color: ${color}">
-          ${escapeHtml(platformName(job.platform))}
+        <span class="job-badges">
+          ${job.matchScore != null ? `<span class="match-badge">Khớp ${job.matchScore}%</span>` : ''}
+          <span class="job-platform-badge" style="background: ${color}1a; color: ${color}">
+            ${escapeHtml(platformName(job.platform))}
+          </span>
         </span>
       </div>
       ${meta.length ? `<div class="job-meta">${meta.join('')}</div>` : ''}
+      ${job.matchedKeywords?.length ? `<p class="job-matched">Khớp kỹ năng: ${job.matchedKeywords.map((k) => escapeHtml(k)).join(', ')}</p>` : ''}
       ${description ? `<p class="job-description">${escapeHtml(description)}</p>` : ''}
       <div class="job-actions">
         <button type="button" class="btn-detail" data-action="detail">Xem chi tiết</button>
@@ -1222,6 +1292,31 @@ function bindGlobalEvents() {
   document.getElementById('search-location')?.addEventListener('change', () => {
     if (state.lastQuery) performSearch(state.lastQuery);
   });
+
+  const cvDrop = document.getElementById('cv-drop');
+  const cvFile = document.getElementById('cv-file');
+  if (cvDrop && cvFile) {
+    cvDrop.addEventListener('click', () => cvFile.click());
+    cvDrop.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        cvFile.click();
+      }
+    });
+    cvFile.addEventListener('change', () => {
+      handleCvFile(cvFile.files?.[0]);
+      cvFile.value = '';
+    });
+    ['dragenter', 'dragover'].forEach((ev) => cvDrop.addEventListener(ev, (event) => {
+      event.preventDefault();
+      cvDrop.classList.add('dragover');
+    }));
+    ['dragleave', 'drop'].forEach((ev) => cvDrop.addEventListener(ev, (event) => {
+      event.preventDefault();
+      cvDrop.classList.remove('dragover');
+    }));
+    cvDrop.addEventListener('drop', (event) => handleCvFile(event.dataTransfer?.files?.[0]));
+  }
 
   document.querySelectorAll('.filter-checkbox input').forEach((checkbox) => {
     checkbox.addEventListener('change', applyFilters);

@@ -1554,4 +1554,4 @@ async function scrapeJobDetail(url, platform) {
   return await getJobDetail(job);
 }
 
-module.exports = { scrapeAll, closeBrowser, getJobDetail, scrapeJobDetail, getMetrics };
+module.exports = { scrapeAll, closeBrowser, getJobDetail, scrapeJobDetail, getMetrics, LOCATIONS, matchesLocation, normalizeText };
